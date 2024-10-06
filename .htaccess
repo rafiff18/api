@@ -1,0 +1,4 @@
+RewriteEngine On
+
+RewriteRule ^(event|event_categories)/?$ routes/$1.php [NC,L]
+RewriteRule ^(event|event_categories)/([0-9]+)/?$ routes/$1.php?id=$2 [NC,L]
