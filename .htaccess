@@ -1,4 +1,4 @@
 RewriteEngine On
 
-RewriteRule ^(events|categories|users|likes|comments|replies|tickets)/?$ routes/$1.php [NC,L]
-RewriteRule ^(events|categories|users|likes|comments|replies|tickets)/([0-9]+)/?$ routes/$1.php?id=$2 [NC,L]
+RewriteRule ^(events|categories|users|likes|comments|replies|tickets|auth)/?$ routes/$1.php [NC,L]
+RewriteRule ^(events|categories|users|likes|comments|replies|tickets|auth)/([0-9]+)/?$ routes/$1.php?id=$2 [NC,L]

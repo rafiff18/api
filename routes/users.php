@@ -1,5 +1,6 @@
 <?php
 
+require_once "../helpers/HeaderAccessControl.php";
 require_once "../controllers/UserController.php";
 require_once "../database/Database.php";
 
