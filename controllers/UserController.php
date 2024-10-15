@@ -86,7 +86,7 @@ class UserController {
             if ($stmt->execute([             
                 $input['username'], 
                 $input['email'], 
-                $input['password'], 
+                password_hash($input['password'], PASSWORD_DEFAULT), 
                 $input['role']
             ])) {
                 $result_stmt = $this->conn->prepare("SELECT * FROM users WHERE users_id = ?");
