@@ -1,5 +1,6 @@
 <?php
 
+require_once "../helpers/HeaderAccessControl.php";
 require_once "../database/Database.php";
 require_once "../controllers/EventController.php";
 // Membuat instance dari kelas Database

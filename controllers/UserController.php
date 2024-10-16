@@ -62,31 +62,40 @@ class UserController {
 
     // Buat user baru
     public function createUser() {
-        $this->setHeaders();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $data = json_decode(file_get_contents("php://input"), true);
-            
-            // Validasi role
-            if (empty($data['role'])) {
-                header("HTTP/1.0 400 Bad Request");
-                echo json_encode([
-                    'status' => 'error',
-                    'message' => 'Role harus diisi.'
-                ], JSON_PRETTY_PRINT);
-                return;
-            }
-
-            $this->users_id = uniqid();
-            $this->username = htmlspecialchars(strip_tags($data['username'] ?? ''));
-            $this->email = htmlspecialchars(strip_tags($data['email'] ?? ''));
-            $this->password = htmlspecialchars(strip_tags($data['password'] ?? ''));
-            $this->role = htmlspecialchars(strip_tags($data['role'] ?? ''));
-
-            if ($this->create()) {
-                echo json_encode([
-                    'status' => 'success',
-                    'message' => 'User berhasil dibuat.'
-                ], JSON_PRETTY_PRINT);
+        // Menerima data JSON dan mendekode
+        $input = json_decode(file_get_contents('php://input'), true);
+    
+        // Pastikan input bukan null dan merupakan array
+        if (!is_array($input)) {
+            response(false, 'Invalid JSON input', null, [
+                'code' => 400,
+                'message' => 'Bad request: JSON input is required'
+            ]);
+            return;
+        }
+    
+        $requiredFields = ['username', 'email', 'password', 'role'];
+        $missingParams = array_diff($requiredFields, array_keys($input));
+    
+        if (empty($missingParams)) {
+            // Mengambil nilai maksimum dari users_id yang ada
+            $stmt = $this->conn->query("SELECT MAX(users_id) as max_id FROM users");
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $new_id = $result['max_id'] + 1; 
+    
+            $query = "INSERT INTO users ( username, email, password, role) VALUES (?, ?, ?, ?)";
+            $stmt = $this->conn->prepare($query);
+    
+            if ($stmt->execute([             
+                $input['username'], 
+                $input['email'], 
+                $input['password'], 
+                $input['role']
+            ])) {
+                $result_stmt = $this->conn->prepare("SELECT * FROM users WHERE users_id = ?");
+                $result_stmt->execute([$new_id]);
+                $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
+                response(true, 'User Added Successfully', $new_data);
             } else {
                 header("HTTP/1.0 400 Bad Request");
                 echo json_encode([

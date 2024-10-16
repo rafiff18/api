@@ -2,24 +2,14 @@
 require_once "../database/Database.php";
 
 class AuthController {
-    private $db;
+    private $conn;
 
-    public function __construct($db) {
-        $this->db = $db;
-    }
-
-    private function setHeaders() {
-        header("Content-Type: application/json; charset=UTF-8");
-        header("Access-Control-Allow-Origin: http://localhost:50581"); // Ganti dengan URL frontend Anda
-        header("Access-Control-Allow-Credentials: true");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type, Authorization");
-        header("Access-Control-Max-Age: 3600");
+    public function __construct($conn) {
+        $this->conn = $conn;
     }
 
     // User login
     public function login() {
-        $this->setHeaders();
         $data = json_decode(file_get_contents("php://input"), true);
 
         $email = $data['email'] ?? '';
@@ -37,7 +27,7 @@ class AuthController {
             return;
         }
 
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt = $this->conn->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -60,14 +50,12 @@ class AuthController {
 
     // User logout
     public function logout() {
-        $this->setHeaders();
         session_destroy();
         echo json_encode(['status' => 'success', 'message' => 'Logout berhasil.'], JSON_PRETTY_PRINT);
     }
 
     // Ubah password
     public function changePassword($usersId) {
-        $this->setHeaders();
         $data = json_decode(file_get_contents("php://input"), true);
 
         $oldPassword = $data['oldPassword'] ?? '';
@@ -79,14 +67,14 @@ class AuthController {
             return;
         }
 
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE users_id = ?");
+        $stmt = $this->conn->prepare("SELECT * FROM users WHERE users_id = ?");
         $stmt->execute([$usersId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($result) {
             if (password_verify($oldPassword, $result['password'])) {
                 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-                $updateStmt = $this->db->prepare("UPDATE users SET password = ? WHERE users_id = ?");
+                $updateStmt = $this->conn->prepare("UPDATE users SET password = ? WHERE users_id = ?");
                 $updateStmt->execute([$hashedPassword, $usersId]);
 
                 echo json_encode(['status' => 'success', 'message' => 'Password berhasil diubah.'], JSON_PRETTY_PRINT);
