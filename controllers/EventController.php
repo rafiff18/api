@@ -56,57 +56,51 @@ class EventController {
     }
 
     public function createEvent() {
-        $arrcheckpost = array(
-            'title' => '', 
-            'date_add' => '', 
-            'category_id' => '', 
-            'desc_event' => '',
-            'poster' => '',
-            'location' => '',
-            'quota' => '',
-            'date_start' => '',
-            'date_end' => ''
-        );
-
-        $count = count(array_intersect_key($_POST, $arrcheckpost));
-        
-        if ($count == count($arrcheckpost)) {
-            $query = "INSERT INTO event_main (title, date_add, category_id, desc_event, poster, location, quota, date_start, date_end) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $this->conn->prepare($query);
-
-            if ($stmt->execute([
-                $_POST['title'], 
-                $_POST['date_add'], 
-                $_POST['category_id'], 
-                $_POST['desc_event'],
-                $_POST['poster'],
-                $_POST['location'],
-                $_POST['quota'],
-                $_POST['date_start'],
-                $_POST['date_end'],
-            ])) {
-                $insert_id = $this->conn->lastInsertId();
-
-                $result_stmt = $this->conn->prepare("SELECT * FROM event_main WHERE event_id = ?");
-                $result_stmt->execute([$insert_id]);
-                $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-
-                response(true, 'Event Added Successfully', $new_data);
-            } else {
-                response(false, 'Failed to Add Event', null, [
-                    'code' => 500,
-                    'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
+        $input = json_decode(file_get_contents("php://input"), true);
+    
+        $requiredFields = ['title', 'date_add', 'category_id', 'desc_event', 
+                           'poster', 'location', 'quota', 'date_start', 'date_end'];
+    
+        foreach ($requiredFields as $field) {
+            if (!isset($input[$field])) {
+                response(false, 'Missing Parameters', null, [
+                    'code' => 402,
+                    'message' => "Bad request: Missing parameter $field"
                 ]);
+                return;
             }
+        }
+    
+        $query = "INSERT INTO event_main (title, date_add, category_id, desc_event, poster, location, quota, date_start, date_end) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $this->conn->prepare($query);
+    
+        if ($stmt->execute([
+            $input['title'], 
+            $input['date_add'], 
+            $input['category_id'], 
+            $input['desc_event'],
+            $input['poster'],
+            $input['location'],
+            $input['quota'],
+            $input['date_start'],
+            $input['date_end'],
+        ])) {
+            $insert_id = $this->conn->lastInsertId();
+    
+            $result_stmt = $this->conn->prepare("SELECT * FROM event_main WHERE event_id = ?");
+            $result_stmt->execute([$insert_id]);
+            $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
+    
+            response(true, 'Event Added Successfully', $new_data);
         } else {
-            response(false, 'Missing Parameters', null, [
-                'code' => 402,
-                'message' => 'Bad request: Missing required parameters'
+            response(false, 'Failed to Add Event', null, [
+                'code' => 500,
+                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
             ]);
         }
     }
-
+    
     public function updateEvent($id) {
         $input = json_decode(file_get_contents('php://input'), true);
     
@@ -158,7 +152,6 @@ class EventController {
         }
     }
     
-
     public function deleteEvent($id) {
         $stmt = $this->conn->prepare('DELETE FROM event_main WHERE event_id = ?');
 
