@@ -54,6 +54,34 @@ class CommentController {
         }
     }
 
+    public function getCommentByEventId($event_id) {
+        if ($event_id > 0) {
+            $query = "SELECT c.comment_id, c.content_comment, u.username
+            FROM comment_event c
+            JOIN users u ON c.users_id = u.users_id
+            WHERE c.event_id = ?
+            ORDER BY c.created_at DESC";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$event_id]);
+
+            if ($stmt->rowCount() > 0) {
+                $data = $stmt->fetchAll(PDO::FETCH_OBJ);
+                response(true, 'Comments Retrieved Successfully', $data);
+            } else {
+                response(false, 'No Comments Found for this Event', null, [
+                    'code' => 404,
+                    'message' => 'No comments found for the specified event'
+                ]);
+            }
+        } else {
+            response(false, 'Invalid Event ID', null, [
+                'code' => 401,
+                'message' => 'Bad request: Event ID must be greater than 0'
+            ]);
+        }
+    }
+
     // 3. CREATE COMMENT
     public function createComment() {
         $input = json_decode(file_get_contents('php://input'), true);
