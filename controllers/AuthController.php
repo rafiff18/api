@@ -35,6 +35,7 @@ class AuthController {
             if (password_verify($password, $result['password'])) {
                 $_SESSION['users_id'] = $result['users_id'];
                 $_SESSION['username'] = $result['username'];
+                $_SESSION['email'] = $result['email'];
                 $_SESSION['role'] = $result['role'];
 
                 echo json_encode(['status' => 'success', 'message' => 'Login berhasil.'], JSON_PRETTY_PRINT);
