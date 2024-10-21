@@ -1,5 +1,6 @@
 <?php
-include_once '../config/database.php';
+require_once '../database/Database.php';
+require_once '../helpers/responseHelper.php';
 
 class UserController {
     private $conn;
@@ -15,17 +16,8 @@ class UserController {
         $this->conn = $db;
     }
 
-    private function setHeaders() {
-        header("Content-Type: application/json; charset=UTF-8");
-        header("Access-Control-Allow-Origin: *");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
-        header("Access-Control-Allow-Headers: Content-Type, Authorization");
-        header("Access-Control-Max-Age: 3600");
-    }
-
     // Ambil semua users
     public function getAllUsers() {
-        $this->setHeaders();
         $query = "SELECT * FROM " . $this->table_name;
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
@@ -39,7 +31,6 @@ class UserController {
 
     // Ambil user berdasarkan ID
     public function getUserById($id) {
-        $this->setHeaders();
         $query = "SELECT * FROM " . $this->table_name . " WHERE users_id = :users_id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':users_id', $id);
@@ -89,7 +80,7 @@ class UserController {
             if ($stmt->execute([             
                 $input['username'], 
                 $input['email'], 
-                $input['password'], 
+                password_hash($input['password'], PASSWORD_BCRYPT), 
                 $input['role']
             ])) {
                 $result_stmt = $this->conn->prepare("SELECT * FROM users WHERE users_id = ?");
@@ -128,7 +119,6 @@ class UserController {
 
     // Update user
     public function updateUser($users_id) {
-        $this->setHeaders();
         if ($_SERVER['REQUEST_METHOD'] == 'PUT') {
             parse_str(file_get_contents("php://input"), $_PUT);
 
@@ -172,7 +162,6 @@ class UserController {
 
     // Hapus user
     public function deleteUser($users_id) {
-        $this->setHeaders();
         if ($_SERVER['REQUEST_METHOD'] == 'DELETE') {
             if ($this->delete($users_id)) {
                 echo json_encode([
