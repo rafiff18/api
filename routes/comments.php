@@ -18,6 +18,9 @@ switch ($request_method) {
         if (!empty($_GET["id"])) {
             $id = intval($_GET["id"]);
             $controller->getCommentById($id);
+        } else if (!empty($_GET["event_id"])) {
+            $event_id = intval($_GET["event_id"]);
+            $controller->getCommentByEventId($event_id);
         } else {
             $controller->getAllComments();
         }
