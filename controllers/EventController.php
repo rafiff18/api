@@ -164,5 +164,28 @@ class EventController {
             ]);
         }
     }
+    public function searchEvent($keyword) {
+        $query = "SELECT * FROM event_main WHERE title LIKE ? OR location LIKE ? OR desc_event LIKE ?";
+        $stmt = $this->conn->prepare($query);
+        
+        // Tambahkan wildcard "%" pada keyword untuk pencarian yang lebih fleksibel
+        $keyword = "%" . $keyword . "%";
+        $stmt->execute([$keyword, $keyword, $keyword]);
+    
+        $data = array();
+    
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Events Found', $data);
+        } else {
+            response(false, 'No events found matching the search keyword', null, [
+                'code' => 404,
+                'message' => 'No matching events'
+            ]);
+        }
+    }
+    
 }
 ?>
