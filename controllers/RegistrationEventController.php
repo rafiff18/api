@@ -57,20 +57,26 @@
             if ($user_id > 0) {
                 $query = "SELECT 
                 re.regist_id, 
-                re.users_id, 
-                re.event_id, 
                 re.qr_code, 
                 re.is_present, 
                 re.registration_time,
                 u.username, 
                 e.title, 
-                e.poster
+                e.poster,
+                e.desc_event,
+                e.date_start,
+                e.date_end,
+                e.location, 
+                e.category_id,
+                c.category_name,
+                e.quota
             FROM 
                 regist_event re
             JOIN 
                 users u ON re.users_id = u.users_id
             JOIN 
                 event_main e ON re.event_id = e.event_id
+            JOIN category c ON e.category_id = c.category_id
             WHERE re.users_id = ?
             ORDER BY 
                 re.registration_time DESC;
