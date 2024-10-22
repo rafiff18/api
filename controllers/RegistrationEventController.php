@@ -25,33 +25,45 @@
                 response(false, "User not logged in", null, "Unauthorized", 401);
                 exit;
             }
-
+        
             $input = json_decode(file_get_contents("php://input"), true);
-
+        
             $event_id = $input['event_id'];
             $user_id = $_SESSION['users_id'];
-
+        
             if (!$event_id) {
                 header("HTTP/1.0 400 Bad Request");
-                response(false, 'Event id is required', null, "Invalid Id", );
-            }
-
-            if ($this->isUserJoined($user_id, $event_id)) {
-                response(false, "Kamu telah bergabung pada evetn ini!", null, "Failed joining event", 409);
+                response(false, 'Event id is required', null, "Invalid Id", 400);
                 exit;
             }
-
+        
+            // Periksa role user
+            $role_query = "SELECT role FROM users WHERE users_id = ?";
+            $role_stmt = $this->conn->prepare($role_query);
+            $role_stmt->execute([$user_id]);
+            $role = $role_stmt->fetchColumn();
+        
+            if ($role !== 'member') {
+                response(false, "Only members can join the event", null, "Forbidden", 403);
+                exit;
+            }
+        
+            if ($this->isUserJoined($user_id, $event_id)) {
+                response(false, "Kamu telah bergabung pada event ini!", null, "Failed joining event", 409);
+                exit;
+            }
+        
             try {
                 $query = "INSERT INTO regist_event (users_id, event_id) VALUES (?, ?)";
                 $stmt = $this->conn->prepare($query);
                 $stmt->execute([$user_id, $event_id]);
                 $new_data = $stmt->fetch(PDO::FETCH_OBJ);
-
+        
                 response(true, "Successfully joining event", $new_data, "Success");
             } catch (Exception $e) {
-                response(false, "Registraion failed ", null,  $e, $e->getCode());
+                response(false, "Registration failed", null,  $e, $e->getCode());
             }
-        }
+        }        
 
         public function getEventByUserId($user_id) {
             if ($user_id > 0) {
