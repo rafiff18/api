@@ -186,5 +186,89 @@ class UserController {
 
         return $stmt->execute();
     }
+    // Tambahkan fungsi resetPassword
+public function resetPassword($users_id) {
+    // Password default, bisa disesuaikan
+    $default_password = "password123";
+    
+    // Hash password default
+    $hashed_password = password_hash($default_password, PASSWORD_BCRYPT);
+
+    // Update password user dengan password default
+    $query = "UPDATE " . $this->table_name . " SET password = :password WHERE users_id = :users_id";
+    $stmt = $this->conn->prepare($query);
+
+    // Bind parameter
+    $stmt->bindParam(":password", $hashed_password);
+    $stmt->bindParam(":users_id", $users_id);
+
+    // Eksekusi query dan cek apakah berhasil
+    if ($stmt->execute()) {
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Password berhasil direset. Password default: ' . $default_password
+        ], JSON_PRETTY_PRINT);
+    } else {
+        header("HTTP/1.0 400 Bad Request");
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Gagal mereset password.'
+        ], JSON_PRETTY_PRINT);
+    }
+}
+// Tambahkan fungsi untuk reset password
+public function forgotPassword() {
+    // Menerima input email atau ID dari request
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    // Validasi input apakah email atau ID ada
+    if (empty($input['email'])) {
+        response(false, 'Email is required', null, [
+            'code' => 400,
+            'message' => 'Bad request: Email is required'
+        ]);
+        return;
+    }
+
+    // Cari user berdasarkan email
+    $query = "SELECT * FROM " . $this->table_name . " WHERE email = :email";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(":email", $input['email']);
+    $stmt->execute();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user) {
+        // Set password default jika pengguna ditemukan
+        $default_password = "password123";
+        $hashed_password = password_hash($default_password, PASSWORD_BCRYPT);
+
+        // Update password user di database
+        $query = "UPDATE " . $this->table_name . " SET password = :password WHERE email = :email";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":password", $hashed_password);
+        $stmt->bindParam(":email", $input['email']);
+
+        if ($stmt->execute()) {
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'Password berhasil direset. Password default: ' . $default_password
+            ], JSON_PRETTY_PRINT);
+        } else {
+            header("HTTP/1.0 400 Bad Request");
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Gagal mereset password.'
+            ], JSON_PRETTY_PRINT);
+        }
+    } else {
+        header("HTTP/1.0 404 Not Found");
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Email tidak ditemukan.'
+        ], JSON_PRETTY_PRINT);
+    }
+}
+
+
 }
 ?>
