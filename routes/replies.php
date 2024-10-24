@@ -2,7 +2,7 @@
 
 require_once "../helpers/HeaderAccessControl.php";
 require_once "../database/Database.php";
-require_once "../controllers/ReplayCommetController.php";
+require_once "../controllers/ReplayCommentController.php";
 
 $database = new Database();
 $conn = $database->getConnection();
