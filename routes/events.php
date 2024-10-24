@@ -15,12 +15,19 @@ $request_method = $_SERVER["REQUEST_METHOD"];
 switch ($request_method) {
     case "GET":
         if (!empty($_GET["id"])) {
+            // Ambil event berdasarkan ID
             $id = intval($_GET["id"]);
             $controller->getEventById($id);
+        } elseif (!empty($_GET["keyword"])) {
+            // Cari event berdasarkan keyword
+            $keyword = $_GET["keyword"];
+            $controller->searchEvent($keyword);
         } else {
+            // Ambil semua event
             $controller->getAllEvent();
         }
         break;
+    
     case "POST":
         $controller->createEvent();
         break;
