@@ -269,6 +269,49 @@ public function forgotPassword() {
     }
 }
 
+public function changePassword($id) {
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($input['old_password']) || !isset($input['new_password'])) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Password lama dan baru dibutuhkan.'
+        ], JSON_PRETTY_PRINT);
+        return;
+    }
+
+    $query = "SELECT password FROM " . $this->table_name . " WHERE users_id = :users_id";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':users_id', $id, PDO::PARAM_INT);
+    $stmt->execute();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user && password_verify($input['old_password'], $user['password'])) {
+        $new_password_hashed = password_hash($input['new_password'], PASSWORD_BCRYPT);
+
+        $update_query = "UPDATE " . $this->table_name . " SET password = :password WHERE users_id = :users_id";
+        $update_stmt = $this->conn->prepare($update_query);
+        $update_stmt->bindParam(':password', $new_password_hashed);
+        $update_stmt->bindParam(':users_id', $id, PDO::PARAM_INT);
+
+        if ($update_stmt->execute()) {
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'Password berhasil diperbarui.'
+            ], JSON_PRETTY_PRINT);
+        } else {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Gagal memperbarui password.'
+            ], JSON_PRETTY_PRINT);
+        }
+    } else {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Password lama tidak sesuai.'
+        ], JSON_PRETTY_PRINT);
+    }
+}
 
 }
 ?>
