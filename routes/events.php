@@ -22,6 +22,10 @@ switch ($request_method) {
             // Cari event berdasarkan keyword
             $keyword = $_GET["keyword"];
             $controller->searchEvent($keyword);
+        } elseif (!empty($_GET["filter"])) {
+            // Filter event berdasarkan tanggal
+            $filter = $_GET["filter"];
+            $controller->filterEventsByDate($filter);
         } else {
             // Ambil semua event
             $controller->getAllEvent();

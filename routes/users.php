@@ -19,8 +19,22 @@ switch ($request_method) {
         $controller->getAllUsers();
        }
        break;
-    case "POST":
-        $controller->createUser();
+       case "POST":
+        if (isset($_GET['action']) && $_GET['action'] == 'forgot_password') {
+            $controller->forgotPassword();
+        } else if (isset($_GET['action']) && $_GET['action'] == 'reset_password') {
+            if (!empty($_GET['id'])) {
+                $id = intval($_GET["id"]);
+                $controller->resetPassword($id);
+            } else {
+                header("HTTP/1.0 400 Bad Request");
+                echo json_encode(['message' => 'ID is required for reset password request']);
+            }
+        } else {
+            $controller->createUser();
+        }
+        break;
+    
         break;
     case "PUT":
         if(!empty($_GET['id'])) {

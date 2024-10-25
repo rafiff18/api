@@ -1,6 +1,6 @@
 <?php
 require_once "../database/Database.php";
-
+//yg coba tarisa
 class AuthController {
     private $conn;
 
