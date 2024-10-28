@@ -168,7 +168,6 @@ class EventController {
         $query = "SELECT * FROM event_main WHERE title LIKE ? OR location LIKE ? OR desc_event LIKE ?";
         $stmt = $this->conn->prepare($query);
         
-        // Tambahkan wildcard "%" pada keyword untuk pencarian yang lebih fleksibel
         $keyword = "%" . $keyword . "%";
         $stmt->execute([$keyword, $keyword, $keyword]);
     
@@ -242,13 +241,47 @@ class EventController {
             return;
         }
     
-        $query = "SELECT * FROM event_category WHERE category_id = ? LIMIT 1";
+        $query = "SELECT category.*, event_main.* 
+                  FROM category 
+                  LEFT JOIN event_main ON category.category_id = event_main.category_id 
+                  WHERE category.category_id = ?";
         $stmt = $this->conn->prepare($query);
         $stmt->execute([$id]);
     
         if ($stmt->rowCount() > 0) {
-            $data = $stmt->fetch(PDO::FETCH_OBJ);
-            response(true, 'Category Retrieved Successfully', $data);
+            $categoryData = null;
+            $events = [];
+            
+            // Ambil data dari hasil query
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                if (!$categoryData) {
+                    $categoryData = (object) [
+                        'category_id' => $row->category_id,
+                        'category_name' => $row->category_name
+                    ];
+                }
+                
+                if ($row->event_id !== null) {
+                    $events[] = (object) [
+                        'event_id' => $row->event_id,
+                        'title' => $row->title,
+                        'date_add' => $row->date_add,
+                        'desc_event' => $row->desc_event,
+                        'poster' => $row->poster,
+                        'location' => $row->location,
+                        'quota' => $row->quota,
+                        'date_start' => $row->date_start,
+                        'date_end' => $row->date_end
+                    ];
+                }
+            }
+    
+            $responseData = (object) [
+                'category' => $categoryData,
+                'events' => $events
+            ];
+    
+            response(true, 'Category and Events Retrieved Successfully', $responseData);
         } else {
             response(false, 'Category not found', null, [
                 'code' => 404,
@@ -256,6 +289,7 @@ class EventController {
             ]);
         }
     }
+    
     
 }
 
