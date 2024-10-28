@@ -233,6 +233,30 @@ class EventController {
             ]);
         }
     }
+    public function getCategoryById($id) {
+        if ($id == 0) {
+            response(false, 'Invalid ID', null, [
+                'code' => 401,
+                'message' => 'Bad request: ID is required'
+            ]);
+            return;
+        }
+    
+        $query = "SELECT * FROM event_category WHERE category_id = ? LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$id]);
+    
+        if ($stmt->rowCount() > 0) {
+            $data = $stmt->fetch(PDO::FETCH_OBJ);
+            response(true, 'Category Retrieved Successfully', $data);
+        } else {
+            response(false, 'Category not found', null, [
+                'code' => 404,
+                'message' => 'The requested category could not be found'
+            ]);
+        }
+    }
+    
 }
 
     

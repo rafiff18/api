@@ -26,6 +26,10 @@ switch ($request_method) {
             // Filter event berdasarkan tanggal
             $filter = $_GET["filter"];
             $controller->filterEventsByDate($filter);
+        } elseif (!empty($_GET["category_id"])) {
+            // Ambil kategori berdasarkan ID
+            $category_id = intval($_GET["category_id"]);
+            $controller->getCategoryById($category_id);
         } else {
             // Ambil semua event
             $controller->getAllEvent();
