@@ -200,6 +200,7 @@ class EventController {
             ]);
         }
     }
+    
     public function filterEventsByDate($filterType) {
         $query = "";
     
