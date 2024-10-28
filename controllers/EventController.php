@@ -165,12 +165,27 @@ class EventController {
         }
     }
     public function searchEvent($keyword) {
-        $query = "SELECT * FROM event_main WHERE title LIKE ? OR location LIKE ? OR desc_event LIKE ?";
+        $query = "SELECT 
+            e.event_id,
+            e.title,
+            e.date_add,
+            e.date_start,
+            e.date_end,
+            e.poster,
+            e.location, 
+            c.category_name 
+        FROM 
+            event_main e
+        JOIN 
+            category c ON e.category_id = c.category_id
+        WHERE 
+            e.title LIKE ?
+      ";
         $stmt = $this->conn->prepare($query);
         
         // Tambahkan wildcard "%" pada keyword untuk pencarian yang lebih fleksibel
         $keyword = "%" . $keyword . "%";
-        $stmt->execute([$keyword, $keyword, $keyword]);
+        $stmt->execute([$keyword]);
     
         $data = array();
     
@@ -187,22 +202,33 @@ class EventController {
         }
     }
     public function filterEventsByDate($filterType) {
-        $currentDate = date('Y-m-d H:i:s');
         $query = "";
-        
+    
         switch ($filterType) {
             case 'latest': // Event terbaru
-                $query = "SELECT * FROM event_main ORDER BY date_add DESC";
+                $query = "SELECT e.*, c.category_name 
+                          FROM event_main e 
+                          JOIN category c ON e.category_id = c.category_id 
+                          WHERE e.date_add <= NOW() 
+                          ORDER BY e.date_add DESC";
                 break;
-            
-            case 'last7days': // 7 hari terakhir
-                $query = "SELECT * FROM event_main WHERE date_add >= DATE_SUB(?, INTERVAL 7 DAY) ORDER BY date_add DESC";
+    
+            case 'last7days': // Event dalam 7 hari terakhir
+                $query = "SELECT e.*, c.category_name 
+                          FROM event_main e 
+                          JOIN category c ON e.category_id = c.category_id 
+                          WHERE e.date_add >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+                          ORDER BY e.date_add DESC";
                 break;
-                
-            case 'last30days': // 1 bulan terakhir
-                $query = "SELECT * FROM event_main WHERE date_add >= DATE_SUB(?, INTERVAL 30 DAY) ORDER BY date_add DESC";
+    
+            case 'last30days': // Event dalam 30 hari terakhir
+                $query = "SELECT e.*, c.category_name 
+                          FROM event_main e 
+                          JOIN category c ON e.category_id = c.category_id 
+                          WHERE e.date_add >= DATE_SUB(NOW(), INTERVAL 30 DAY) 
+                          ORDER BY e.date_add DESC";
                 break;
-            
+    
             default:
                 response(false, 'Invalid filter type', null, [
                     'code' => 400,
@@ -210,31 +236,27 @@ class EventController {
                 ]);
                 return;
         }
-
-        $stmt = $this->conn->prepare($query);
-
-        // Jika menggunakan filter 7 hari atau 30 hari terakhir, masukkan $currentDate sebagai parameter
-        if ($filterType == 'last7days' || $filterType == 'last30days') {
-            $stmt->execute([$currentDate]);
-        } else {
+    
+        try {
+            $stmt = $this->conn->prepare($query);
             $stmt->execute();
-        }
-
-        $data = array();
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
+    
+            $data = $stmt->fetchAll(PDO::FETCH_OBJ);
+    
+            if (count($data) > 0) {
+                response(true, 'Events filtered successfully', $data);
+            } else {
+                response(false, 'No events found for this filter', null, [
+                    'code' => 404,
+                    'message' => 'No matching events for this filter'
+                ]);
             }
-            response(true, 'Events filtered successfully', $data);
-        } else {
-            response(false, 'No events found for this filter', null, [
-                'code' => 404,
-                'message' => 'No matching events for this filter'
+        } catch (PDOException $e) {
+            response(false, 'Database error', null, [
+                'code' => 500,
+                'message' => $e->getMessage()
             ]);
         }
     }
 }
-
-    
-
 ?>

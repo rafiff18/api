@@ -73,6 +73,7 @@
                 re.is_present, 
                 re.registration_time,
                 u.username, 
+                e.event_id, 
                 e.title, 
                 e.poster,
                 e.desc_event,
