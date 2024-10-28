@@ -30,6 +30,9 @@ switch ($request_method) {
             // Ambil kategori berdasarkan ID
             $category_id = intval($_GET["category_id"]);
             $controller->getCategoryById($category_id);
+        }    elseif (isset($_GET["upcoming"])) { 
+            // Tambahkan kondisi untuk upcoming events
+                $controller->upcomingEvent();
         } else {
             // Ambil semua event
             $controller->getAllEvent();

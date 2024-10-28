@@ -290,6 +290,58 @@ class EventController {
         }
     }
     
+    public function getJoinedEventsByUserId($usersId) {
+        if ($usersId == 0) {
+            response(false, 'Invalid User ID', null, [
+                'code' => 401,
+                'message' => 'Bad request: User ID is required'
+            ]);
+            return;
+        }
+    
+        $query = "SELECT event_main.* 
+                  FROM event_main 
+                  INNER JOIN event_participants ON event_main.event_id = event_participants.event_id 
+                  WHERE event_participants.user_id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$usersId]);
+    
+        $data = array();
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'List of Joined Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No events found for this user', null, [
+                'code' => 404,
+                'message' => 'No matching events for this user'
+            ]);
+        }
+    }
+    public function upcomingEvent() {
+        $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
+    
+        // Query untuk memilih event yang tanggal mulai lebih besar dari tanggal sekarang (berarti akan datang)
+        $query = "SELECT * FROM event_main WHERE date_start > ? ORDER BY date_start ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$currentDate]);
+    
+        $data = array();
+        
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Upcoming Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No upcoming events found', null, [
+                'code' => 404,
+                'message' => 'No events are scheduled for upcoming dates'
+            ]);
+        }
+    }
+    
     
 }
 
