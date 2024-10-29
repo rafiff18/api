@@ -228,7 +228,7 @@ class EventController {
             ]);
         }
     }
-    public function getCategoryById($id) {
+    public function getEventByCategoryId($id) {
         if ($id == 0) {
             response(false, 'Invalid ID', null, 'Bad request: ID is required', 401);
             return;
