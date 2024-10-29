@@ -29,7 +29,7 @@ switch ($request_method) {
         } elseif (!empty($_GET["category_id"])) {
             // Ambil kategori berdasarkan ID
             $category_id = intval($_GET["category_id"]);
-            $controller->getCategoryById($category_id);
+            $controller->getEventByCategoryId($category_id);
         }    elseif (isset($_GET["upcoming"])) { 
             // Tambahkan kondisi untuk upcoming events
                 $controller->upcomingEvent();
