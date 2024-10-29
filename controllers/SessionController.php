@@ -13,14 +13,13 @@ class SessionController {
     public function getSession() {
         if (isset($_SESSION['users_id'])) {
             $response = [
-                'status' => 'success',
                 'users_id' => $_SESSION['users_id'],
                 'username' => $_SESSION['username'],
                 'email' => $_SESSION['email'],
             ];
-            response(true, "Successfully get session", $response, null);
+            response('success', "Successfully get session", $response);
         } else {
-            response(false, "Session not found or user not logged in", null, "User not logged in", 404);
+            response('error', "Session not found or user not logged in", null, 404);
         }
     }
 }

@@ -25,10 +25,7 @@ class EventController {
             }
             response(true, 'List of Events Retrieved Successfully', $data);
         } else {
-            response(false, 'Failed to Retrieve Events', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Retrieve Events', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
 
@@ -42,10 +39,7 @@ class EventController {
                 $data = $stmt->fetch(PDO::FETCH_OBJ);
                 response(true, 'Event Retrieved Successfully', $data);
             } else {
-                response(false, 'Event not found', null, [
-                    'code' => 404,
-                    'message' => 'The requested resource could not be found'
-                ]);
+                response(false, 'Event not found', null, 'The requested resource could not be found', 404);
             }
         } else {
             response(false, 'Invalid ID', null, [
@@ -63,10 +57,7 @@ class EventController {
     
         foreach ($requiredFields as $field) {
             if (!isset($input[$field])) {
-                response(false, 'Missing Parameters', null, [
-                    'code' => 402,
-                    'message' => "Bad request: Missing parameter $field"
-                ]);
+                response(false, 'Missing Parameters', null, "Bad request: Missing parameter $field", 402);
                 return;
             }
         }
@@ -94,10 +85,7 @@ class EventController {
     
             response(true, 'Event Added Successfully', $new_data);
         } else {
-            response(false, 'Failed to Add Event', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Add Event', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
     
@@ -105,10 +93,7 @@ class EventController {
         $input = json_decode(file_get_contents('php://input'), true);
     
         if (json_last_error() !== JSON_ERROR_NONE) {
-            response(false, 'Invalid JSON Format', null, [
-                'code' => 400,
-                'message' => 'Bad request: JSON parsing error'
-            ]);
+            response(false, 'Invalid JSON Format', null, 'Bad request: JSON parsing error', 400);
             return;
         }
     
@@ -145,10 +130,7 @@ class EventController {
     
             response(true, 'Event Updated Successfully', $updated_data);
         } else {
-            response(false, 'Failed to Update Event', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Update Event', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
     
@@ -158,10 +140,7 @@ class EventController {
         if ($stmt->execute([$id])) {
             response(true, 'Event Deleted Successfully');
         } else {
-            response(false, 'Failed to Delete Event', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Delete Event', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
     public function searchEvent($keyword) {
@@ -194,10 +173,7 @@ class EventController {
             }
             response(true, 'Events Found', $data);
         } else {
-            response(false, 'No events found matching the search keyword', null, [
-                'code' => 404,
-                'message' => 'No matching events'
-            ]);
+            response(false, 'No events found matching the search keyword', null, 'No matching events', 404);
         }
     }
     
@@ -230,10 +206,7 @@ class EventController {
                 break;
     
             default:
-                response(false, 'Invalid filter type', null, [
-                    'code' => 400,
-                    'message' => 'Invalid filter type provided'
-                ]);
+                response(false, 'Invalid filter type', null,  'Invalid filter type provided', 404);
                 return;
         }
     
@@ -246,10 +219,7 @@ class EventController {
             if (count($data) > 0) {
                 response(true, 'Events filtered successfully', $data);
             } else {
-                response(false, 'No events found for this filter', null, [
-                    'code' => 404,
-                    'message' => 'No matching events for this filter'
-                ]);
+                response(false, 'No events found for this filter', null, 'No matching events for this filter', 404);
             }
         } catch (PDOException $e) {
             response(false, 'Database error', null, [
@@ -260,10 +230,7 @@ class EventController {
     }
     public function getCategoryById($id) {
         if ($id == 0) {
-            response(false, 'Invalid ID', null, [
-                'code' => 401,
-                'message' => 'Bad request: ID is required'
-            ]);
+            response(false, 'Invalid ID', null, 'Bad request: ID is required', 401);
             return;
         }
     
@@ -309,19 +276,13 @@ class EventController {
     
             response(true, 'Category and Events Retrieved Successfully', $responseData);
         } else {
-            response(false, 'Category not found', null, [
-                'code' => 404,
-                'message' => 'The requested category could not be found'
-            ]);
+            response(false, 'Category not found', null, 'The requested category could not be found', 404);
         }
     }
     
     public function getJoinedEventsByUserId($usersId) {
         if ($usersId == 0) {
-            response(false, 'Invalid User ID', null, [
-                'code' => 401,
-                'message' => 'Bad request: User ID is required'
-            ]);
+            response(false, 'Invalid User ID', null, 'Bad request: User ID is required', 401);
             return;
         }
     
@@ -339,10 +300,7 @@ class EventController {
             }
             response(true, 'List of Joined Events Retrieved Successfully', $data);
         } else {
-            response(false, 'No events found for this user', null, [
-                'code' => 404,
-                'message' => 'No matching events for this user'
-            ]);
+            response(false, 'No events found for this user', null, 'No matching events for this user', 404);
         }
     }
     public function upcomingEvent() {
@@ -361,13 +319,8 @@ class EventController {
             }
             response(true, 'Upcoming Events Retrieved Successfully', $data);
         } else {
-            response(false, 'No upcoming events found', null, [
-                'code' => 404,
-                'message' => 'No events are scheduled for upcoming dates'
-            ]);
+            response(false, 'No upcoming events found', null, 'No events are scheduled for upcoming dates', 404);
         }
     }
-    
-    
 }
 ?>

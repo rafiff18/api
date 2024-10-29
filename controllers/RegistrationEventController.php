@@ -22,7 +22,7 @@
 
         public function register() {
             if (!isset($_SESSION["users_id"])) {
-                response(false, "User not logged in", null, "Unauthorized", 401);
+                response('error', "Unauthorized", null, 401);
                 exit;
             }
         
@@ -32,8 +32,7 @@
             $user_id = $_SESSION['users_id'];
         
             if (!$event_id) {
-                header("HTTP/1.0 400 Bad Request");
-                response(false, 'Event id is required', null, "Invalid Id", 400);
+                response('error', 'Event id is required', null, 400);
                 exit;
             }
         
@@ -44,12 +43,12 @@
             $role = $role_stmt->fetchColumn();
         
             if ($role !== 'member') {
-                response(false, "Only members can join the event", null, "Forbidden", 403);
+                response('error', "Only members can join the event", null, 403);
                 exit;
             }
         
             if ($this->isUserJoined($user_id, $event_id)) {
-                response(false, "Kamu telah bergabung pada event ini!", null, "Failed joining event", 409);
+                response('error', "You have already join this event!", null, 409);
                 exit;
             }
         
@@ -59,9 +58,9 @@
                 $stmt->execute([$user_id, $event_id]);
                 $new_data = $stmt->fetch(PDO::FETCH_OBJ);
         
-                response(true, "Successfully joining event", $new_data, "Success");
+                response('success', "Successfully joining event", $new_data);
             } catch (Exception $e) {
-                response(false, "Registration failed", null,  $e, $e->getCode());
+                response('error', "Registration failed", null,  $e, $e->getCode());
             }
         }        
 
@@ -100,18 +99,12 @@
     
                 if ($stmt->rowCount() > 0) {
                     $data = $stmt->fetchAll(PDO::FETCH_OBJ);
-                    response(true, 'Events Retrieved Successfully', $data);
+                    response('success', 'Events Retrieved Successfully', $data);
                 } else {
-                    response(false, 'No Events Found for this user', null, [
-                        'code' => 404,
-                        'message' => 'No Events found for the specified user'
-                    ]);
+                    response('error', 'No Events Found for this user', null, 404);
                 }
             } else {
-                response(false, 'Invalid Event ID', null, [
-                    'code' => 401,
-                    'message' => 'Bad request: Event ID must be greater than 0'
-                ]);
+                response('error', 'Invalid Event ID', null, 401);
             }
         }
     }

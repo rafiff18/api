@@ -1,4 +1,6 @@
 <?php
+require_once "../database/Database.php";
+require_once "../helpers/ResponseHelper.php";
 
 class ReplayCommentController {
     private $db;
@@ -23,15 +25,12 @@ class ReplayCommentController {
             $stmt->bindParam(":content_replay", $data->content_replay);
 
             if ($stmt->execute()) {
-                http_response_code(201);
-                return json_encode(array("message" => "Replay comment was created."));
+                response('success', "Reply comment was creatd successfully.", $data, 201);
             } else {
-                http_response_code(503);
-                return json_encode(array("message" => "Unable to create replay comment."));
+                response('error', "Unable to create replay comment.", null, 503);
             }
         } else {
-            http_response_code(400);
-            return json_encode(array("message" => "Data is incomplete."));
+            response('error', "Data is incomplete.", null, 400);
         }
     }
 
@@ -53,11 +52,9 @@ class ReplayCommentController {
                 );
             }
 
-            http_response_code(200);
-            return json_encode($formatted_comments, JSON_PRETTY_PRINT);
+            response('success', 'Get reply comments successfully.', $formatted_comments);
         } else {
-            http_response_code(404);
-            return json_encode(array("message" => "No replay comment found."));
+            response('error', 'No reply comments found.', null, 404);
         }
     }
 
@@ -75,15 +72,12 @@ class ReplayCommentController {
             $stmt->bindParam(":replay_id", $data->replay_id);
 
             if ($stmt->execute()) {
-                http_response_code(200);
-                return json_encode(array("message" => "Replay comment was updated."));
+                response('success', 'Reply comment was updated successfully.', $data);
             } else {
-                http_response_code(503);
-                return json_encode(array("message" => "Unable to update replay comment."));
+                response('error', 'Unable to update replay comment', null, 503);
             }
         } else {
-            http_response_code(400);
-            return json_encode(array("message" => "Data is incomplete."));
+            response('error', 'Data is incomplete.', null, 400);
         }
     }
 
@@ -99,13 +93,12 @@ class ReplayCommentController {
             if ($stmt->execute()) {
                 http_response_code(200);
                 return json_encode(array("message" => "Replay comment was deleted."));
+                response('success', 'Reply comment was deleted.');
             } else {
-                http_response_code(503);
-                return json_encode(array("message" => "Unable to delete replay comment."));
+                response('error', 'Unable to delete replay comment.', null, 503);
             }
         } else {
-            http_response_code(400);
-            return json_encode(array("message" => "Data is incomplete."));
+            response('error', 'Data is incomplete.', null, 400);
         }
     }
 }

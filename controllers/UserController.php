@@ -23,10 +23,7 @@ class UserController {
         $stmt->execute();
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        echo json_encode([
-            'status' => 'success',
-            'data' => $users
-        ], JSON_PRETTY_PRINT);
+        response('success', 'Get users successfully', $users);
     }
 
     // Ambil user berdasarkan ID
@@ -38,16 +35,9 @@ class UserController {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
-            echo json_encode([
-                'status' => 'success',
-                'data' => $user
-            ], JSON_PRETTY_PRINT);
+            response('success', 'Get user by id successfully', $user);
         } else {
-            header("HTTP/1.0 404 Not Found");
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'User tidak ditemukan.'
-            ], JSON_PRETTY_PRINT);
+            response('error', 'User not found', null, 404);
         }
     }
 
@@ -58,10 +48,7 @@ class UserController {
     
         // Pastikan input bukan null dan merupakan array
         if (!is_array($input)) {
-            response(false, 'Invalid JSON input', null, [
-                'code' => 400,
-                'message' => 'Bad request: JSON input is required'
-            ]);
+            response('error', 'Invalid JSON input', null, 400);
             return;
         }
     
@@ -86,13 +73,10 @@ class UserController {
                 $result_stmt = $this->conn->prepare("SELECT * FROM users WHERE users_id = ?");
                 $result_stmt->execute([$new_id]);
                 $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-                response(true, 'User Added Successfully', $new_data);
+
+                response('success', 'User Added Successfully', $new_data);
             } else {
-                header("HTTP/1.0 400 Bad Request");
-                echo json_encode([
-                    'status' => 'error',
-                    'message' => 'Gagal membuat user.'
-                ], JSON_PRETTY_PRINT);
+                response('error', 'Unable to create user', null, 400);
             }
         }
     }
@@ -129,16 +113,9 @@ class UserController {
             $this->role = htmlspecialchars(strip_tags($_PUT['role'] ?? ''));
 
             if ($this->update()) {
-                echo json_encode([
-                    'status' => 'success',
-                    'message' => 'User berhasil diperbarui.'
-                ], JSON_PRETTY_PRINT);
+                response('success', 'User has been updated');
             } else {
-                header("HTTP/1.0 400 Bad Request");
-                echo json_encode([
-                    'status' => 'error',
-                    'message' => 'Gagal memperbarui user.'
-                ], JSON_PRETTY_PRINT);
+                response('error', 'Failed to update user', null, 400);
             }
         }
     }
@@ -164,16 +141,9 @@ class UserController {
     public function deleteUser($users_id) {
         if ($_SERVER['REQUEST_METHOD'] == 'DELETE') {
             if ($this->delete($users_id)) {
-                echo json_encode([
-                    'status' => 'success',
-                    'message' => 'User berhasil dihapus.'
-                ], JSON_PRETTY_PRINT);
+                response('success', 'User has ben delete');
             } else {
-                header("HTTP/1.0 400 Bad Request");
-                echo json_encode([
-                    'status' => 'error',
-                    'message' => 'Gagal menghapus user.'
-                ], JSON_PRETTY_PRINT);
+                response('error', 'Failed to delete user', null, 400);
             }
         }
     }
@@ -187,35 +157,28 @@ class UserController {
         return $stmt->execute();
     }
     // Tambahkan fungsi resetPassword
-public function resetPassword($users_id) {
-    // Password default, bisa disesuaikan
-    $default_password = "password123";
-    
-    // Hash password default
-    $hashed_password = password_hash($default_password, PASSWORD_BCRYPT);
+    public function resetPassword($users_id) {
+        // Password default, bisa disesuaikan
+        $default_password = "password123";
+        
+        // Hash password default
+        $hashed_password = password_hash($default_password, PASSWORD_BCRYPT);
 
-    // Update password user dengan password default
-    $query = "UPDATE " . $this->table_name . " SET password = :password WHERE users_id = :users_id";
-    $stmt = $this->conn->prepare($query);
+        // Update password user dengan password default
+        $query = "UPDATE " . $this->table_name . " SET password = :password WHERE users_id = :users_id";
+        $stmt = $this->conn->prepare($query);
 
-    // Bind parameter
-    $stmt->bindParam(":password", $hashed_password);
-    $stmt->bindParam(":users_id", $users_id);
+        // Bind parameter
+        $stmt->bindParam(":password", $hashed_password);
+        $stmt->bindParam(":users_id", $users_id);
 
-    // Eksekusi query dan cek apakah berhasil
-    if ($stmt->execute()) {
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'Password berhasil direset. Password default: ' . $default_password
-        ], JSON_PRETTY_PRINT);
-    } else {
-        header("HTTP/1.0 400 Bad Request");
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Gagal mereset password.'
-        ], JSON_PRETTY_PRINT);
+        // Eksekusi query dan cek apakah berhasil
+        if ($stmt->execute()) {
+            response('success', 'Password has been reset to default:'.$default_password);
+        } else {
+            response('error', 'Failed to reset password', null, 400);
+        }
     }
-}
 // Tambahkan fungsi untuk reset password
 public function forgotPassword() {
     // Menerima input email atau ID dari request
@@ -223,10 +186,7 @@ public function forgotPassword() {
 
     // Validasi input apakah email atau ID ada
     if (empty($input['email'])) {
-        response(false, 'Email is required', null, [
-            'code' => 400,
-            'message' => 'Bad request: Email is required'
-        ]);
+        response('error', 'Email is required', null, 400);
         return;
     }
 
@@ -249,23 +209,12 @@ public function forgotPassword() {
         $stmt->bindParam(":email", $input['email']);
 
         if ($stmt->execute()) {
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'Password berhasil direset. Password default: ' . $default_password
-            ], JSON_PRETTY_PRINT);
+            response('success', 'Password has been reset to default : '.$default_password);
         } else {
-            header("HTTP/1.0 400 Bad Request");
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Gagal mereset password.'
-            ], JSON_PRETTY_PRINT);
+            response('error', 'Failed to reset password', null, 400);
         }
     } else {
-        header("HTTP/1.0 404 Not Found");
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Email tidak ditemukan.'
-        ], JSON_PRETTY_PRINT);
+        response('error', 'Email not found', null, 404);
     }
 }
 
@@ -273,10 +222,7 @@ public function changePassword($id) {
     $input = json_decode(file_get_contents('php://input'), true);
 
     if (!isset($input['old_password']) || !isset($input['new_password'])) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Password lama dan baru dibutuhkan.'
-        ], JSON_PRETTY_PRINT);
+        response('error', 'Old password and new password are needed');
         return;
     }
 
@@ -295,21 +241,12 @@ public function changePassword($id) {
         $update_stmt->bindParam(':users_id', $id, PDO::PARAM_INT);
 
         if ($update_stmt->execute()) {
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'Password berhasil diperbarui.'
-            ], JSON_PRETTY_PRINT);
+            response('success', 'Password has been updated');
         } else {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Gagal memperbarui password.'
-            ], JSON_PRETTY_PRINT);
+            response('error', 'Failed to update password', null, 400);
         }
     } else {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Password lama tidak sesuai.'
-        ], JSON_PRETTY_PRINT);
+        response('error', 'Old password are not suitable', null, 400);
     }
 }
 

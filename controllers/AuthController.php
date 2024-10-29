@@ -41,12 +41,9 @@ class AuthController {
                 echo json_encode(['status' => 'success', 'message' => 'Login berhasil.'], JSON_PRETTY_PRINT);
             } else {
                 header("HTTP/1.0 401 Unauthorized");
-                echo json_encode(['status' => 'error', 'message' => 'Password salah.'], JSON_PRETTY_PRINT);
+                echo json_encode(['status' => 'error', 'message' => 'Email atau password salah.'], JSON_PRETTY_PRINT);
             }
-        } else {
-            header("HTTP/1.0 404 Not Found");
-            echo json_encode(['status' => 'error', 'message' => 'Pengguna tidak ditemukan.'], JSON_PRETTY_PRINT);
-        }
+        } 
     }
 
     // User logout

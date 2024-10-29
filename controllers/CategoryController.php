@@ -30,12 +30,9 @@ class CategoryController {
 
         if ($stmt->rowCount() > 0) {
             $data = $stmt->fetch(PDO::FETCH_OBJ);
-            response(true, 'Category Retrieved Successfully', $data);
+            response('success', 'Category Retrieved Successfully', $data);
         } else {
-            response(false, 'Category Not Found', null, [
-                'code' => 404,
-                'message' => 'The requested resource could not be found'
-            ]);
+            response('error', 'Category Not Found', null, 404);
         }
     }
 
@@ -44,10 +41,7 @@ class CategoryController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (is_null($input) || !isset($input['category_name'])) {
-            response(false, 'Invalid JSON or Missing category_name', null, [
-                'code' => 400,
-                'message' => 'Bad request: category_name is required'
-            ]);
+            response('error', 'Invalid JSON or Missing category name', null, 400);
             return;
         }
 
@@ -58,10 +52,7 @@ class CategoryController {
             $id = $this->conn->lastInsertId();
             $this->getCategoryById($id); // Menampilkan data yang baru ditambahkan
         } else {
-            response(false, 'Failed to Create Category', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response('error', 'Failed to Create Category', null, 500);
         }
     }
 
@@ -70,10 +61,7 @@ class CategoryController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (is_null($input) || !isset($input['category_name'])) {
-            response(false, 'Invalid JSON or Missing category_name', null, [
-                'code' => 400,
-                'message' => 'Bad request: category_name is required'
-            ]);
+            response('error', 'Invalid JSON or Missing Category Name', null, 400);
             return;
         }
 
@@ -83,10 +71,7 @@ class CategoryController {
         if ($stmt->execute([$input['category_name'], $id])) {
             $this->getCategoryById($id); // Menampilkan data yang diperbarui
         } else {
-            response(false, 'Failed to Update Category', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response('error', 'Failed to Update Category', null, 500);
         }
     }
 
@@ -95,12 +80,9 @@ class CategoryController {
         $stmt = $this->conn->prepare("DELETE FROM category WHERE category_id = ?");
 
         if ($stmt->execute([$id])) {
-            response(true, 'Category Deleted Successfully');
+            response('success', 'Category Deleted Successfully');
         } else {
-            response(false, 'Failed to Delete Category', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response('error', 'Failed to Delete Category', null, 500);
         }
     }
 }

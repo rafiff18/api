@@ -23,10 +23,7 @@ class CommentController {
             $data = $stmt->fetchAll(PDO::FETCH_OBJ);
             response(true, 'List of Comments Retrieved Successfully', $data);
         } else {
-            response(false, 'Failed to Retrieve Comments', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Retrieve Comments', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
 
@@ -41,16 +38,10 @@ class CommentController {
                 $data = $stmt->fetch(PDO::FETCH_OBJ);
                 response(true, 'Comment Retrieved Successfully', $data);
             } else {
-                response(false, 'Comment Not Found', null, [
-                    'code' => 404,
-                    'message' => 'The requested resource could not be found'
-                ]);
+                response(false, 'Comment Not Found', null, 'The requested resource could not be found', 404);
             }
         } else {
-            response(false, 'Invalid ID', null, [
-                'code' => 401,
-                'message' => 'Bad request: ID must be greater than 0'
-            ]);
+            response(false, 'Invalid ID', null, 'Bad request: ID must be greater than 0', 401);
         }
     }
 
@@ -69,16 +60,10 @@ class CommentController {
                 $data = $stmt->fetchAll(PDO::FETCH_OBJ);
                 response(true, 'Comments Retrieved Successfully', $data);
             } else {
-                response(false, 'No Comments Found for this Event', null, [
-                    'code' => 404,
-                    'message' => 'No comments found for the specified event'
-                ]);
+                response(false, 'No Comments Found for this Event', null, 'No comments found for the specified event', 404);
             }
         } else {
-            response(false, 'Invalid Event ID', null, [
-                'code' => 401,
-                'message' => 'Bad request: Event ID must be greater than 0'
-            ]);
+            response(false, 'Invalid Event ID', null, 'Bad request: Event ID must be greater than 0', 401);
         }
     }
 
@@ -87,10 +72,7 @@ class CommentController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            response(false, 'Invalid JSON Format', null, [
-                'code' => 400,
-                'message' => 'JSON parsing error'
-            ]);
+            response(false, 'Invalid JSON Format', null, 'JSON parsing error', 400);
             return;
         }
 
@@ -98,10 +80,7 @@ class CommentController {
         $missing_fields = array_diff($required_fields, array_keys($input));
 
         if (!empty($missing_fields)) {
-            response(false, 'Missing Parameters', null, [
-                'code' => 402,
-                'message' => 'Missing required parameters: ' . implode(', ', $missing_fields)
-            ]);
+            response(false, 'Missing Parameters', null, 'Missing required parameters: ' . implode(', ', $missing_fields), 402);
             return;
         }
 
@@ -116,10 +95,7 @@ class CommentController {
 
             response(true, 'Comment Added Successfully', $new_data);
         } else {
-            response(false, 'Failed to Add Comment', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Add Comment', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
 
@@ -128,18 +104,12 @@ class CommentController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            response(false, 'Invalid JSON Format', null, [
-                'code' => 400,
-                'message' => 'JSON parsing error'
-            ]);
+            response(false, 'Invalid JSON Format', null, 'JSON parsing error', 400);
             return;
         }
 
         if (empty($input['content_comment'])) {
-            response(false, 'Missing Parameters', null, [
-                'code' => 403,
-                'message' => 'Missing required parameter: content_comment'
-            ]);
+            response(false, 'Missing Parameters', null, 'Missing required parameter: Content Comment', 403);
             return;
         }
 
@@ -153,10 +123,7 @@ class CommentController {
 
             response(true, 'Comment Updated Successfully', $updated_data);
         } else {
-            response(false, 'Failed to Update Comment', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Update Comment', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
 
@@ -167,10 +134,7 @@ class CommentController {
         if ($stmt->execute([$id])) {
             response(true, 'Comment Deleted Successfully');
         } else {
-            response(false, 'Failed to Delete Comment', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to Delete Comment', null, 'Internal server error: ' . $this->conn->errorInfo()[2], 500);
         }
     }
 }

@@ -19,12 +19,9 @@ class TagUserController {
             while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
                 $data[] = $row;
             }
-            response(true, 'Tag users retrieved successfully', $data);
+            response('success', 'Tag users retrieved successfully', $data);
         } else {
-            response(false, 'Failed to retrieve tag users', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response('error', 'Failed to retrieve tag users', null, 500);
         }
     }
 
@@ -36,12 +33,9 @@ class TagUserController {
 
         if ($stmt->rowCount() > 0) {
             $data = $stmt->fetch(PDO::FETCH_OBJ);
-            response(true, 'Tag user retrieved successfully', $data);
+            response('success', 'Tag user retrieved successfully.', $data);
         } else {
-            response(false, 'Tag user not found', null, [
-                'code' => 404,
-                'message' => 'The requested tag user could not be found'
-            ]);
+            response('error', 'Tag user not found.', null, 404);
         }
     }
 
@@ -50,7 +44,7 @@ class TagUserController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!is_array($input)) {
-            response(false, 'Invalid JSON input', null);
+            response('error', 'Invalid JSON input.', null, 400);
             return;
         }
 
@@ -68,18 +62,13 @@ class TagUserController {
                 $result_stmt = $this->conn->prepare("SELECT * FROM tag_user WHERE tag_id = ?");
                 $result_stmt->execute([$new_id]);
                 $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-                response(true, 'Tag user added successfully', $new_data);
+
+                response('success', 'Tag user added successfully.', $new_data);
             } else {
-                response(false, 'Failed to add tag user', null, [
-                    'code' => 400,
-                    'message' => 'Error: ' . $this->conn->errorInfo()[2]
-                ]);
+                response('error', 'Failed to add tag user.', null, 400);
             }
         } else {
-            response(false, 'Missing required fields', null, [
-                'code' => 400,
-                'message' => 'Missing required parameters: ' . implode(', ', $missingParams)
-            ]);
+            response('error', 'Missing required fields', null, 400);
         }
     }
 
@@ -88,7 +77,7 @@ class TagUserController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!is_array($input)) {
-            response(false, 'Invalid JSON input', null);
+            response('error', 'Invalid JSON input', null, 400);
             return;
         }
 
@@ -105,18 +94,13 @@ class TagUserController {
                 $result_stmt = $this->conn->prepare("SELECT * FROM tag_user WHERE tag_id = ?");
                 $result_stmt->execute([$id]);
                 $updated_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-                response(true, 'Tag user updated successfully', $updated_data);
+
+                response('success', 'Tag user updated successfully', $updated_data);
             } else {
-                response(false, 'Failed to update tag user', null, [
-                    'code' => 500,
-                    'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-                ]);
+                response('error', 'Failed to update tag user', null, 500);
             }
         } else {
-            response(false, 'Missing required fields', null, [
-                'code' => 400,
-                'message' => 'Missing required parameters: ' . implode(', ', $missingParams)
-            ]);
+            response('error', 'Missing required fields', null, 400);
         }
     }
 
@@ -125,12 +109,9 @@ class TagUserController {
         $stmt = $this->conn->prepare("DELETE FROM tag_user WHERE tag_id = ?");
 
         if ($stmt->execute([$id])) {
-            response(true, 'Tag user deleted successfully');
+            response('success', 'Tag user deleted successfully');
         } else {
-            response(false, 'Failed to delete tag user', null, [
-                'code' => 500,
-                'message' => 'Internal server error: ' . $this->conn->errorInfo()[2]
-            ]);
+            response(false, 'Failed to delete tag user', null, 500);
         }
     }
 }
