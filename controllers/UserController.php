@@ -1,6 +1,6 @@
 <?php
 require_once '../database/Database.php';
-require_once '../helpers/responseHelper.php';
+require_once '../helpers/ResponseHelper.php';
 
 class UserController {
     private $conn;

@@ -19,7 +19,7 @@ switch ($request_method) {
         $controller->getAllUsers();
        }
        break;
-       case "POST":
+    case "POST":
         if (isset($_GET['action'])) {
             if ($_GET['action'] == 'reset_password') {
                 if (!empty($_GET['id'])) {
