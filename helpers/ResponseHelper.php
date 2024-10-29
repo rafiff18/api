@@ -1,6 +1,6 @@
 <?php
 
-function response($success, $message, $data = null, $error = null, $statusCode = 200) {
+function response($status, $message, $data = null, $statusCode = 200) {
     // Set HTTP status code
     http_response_code($statusCode);
 
@@ -9,10 +9,9 @@ function response($success, $message, $data = null, $error = null, $statusCode =
 
     // Buat array respons
     $response = [
-        "success" => $success,
+        "status" => $status,
         "message" => $message,
         "data" => $data,
-        "error" => $error,
     ];
 
     // Kirim respons JSON
