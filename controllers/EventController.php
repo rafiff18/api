@@ -342,6 +342,29 @@ class EventController {
         }
     }
 
+    public function trendingEvents() {
+        // Query untuk menghitung jumlah registrasi per event_id dan hanya menampilkan yang trending
+        $query = "SELECT COUNT(a.event_id) AS Count, b.*
+                  FROM regist_event a
+                  INNER JOIN event_main b ON a.event_id = b.event_id
+                  GROUP BY a.event_id";
+
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+    
+        $data = array();
+        
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Trending Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No trending events found', null, 'No events have reached the trending threshold', 404);
+        }
+    }
+    
             
 }
 ?>
