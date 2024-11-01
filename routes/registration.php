@@ -11,9 +11,9 @@ $request_methos = $_SERVER["REQUEST_METHOD"];
 
 switch ($request_methos) {
     case "GET": 
-        if (!empty($_GET["user_id"])) {
-            $user_id = intval($_GET["user_id"]);
-            $controller->getEventByUserId($user_id);
+        if (!empty($_GET["users_id"])) {
+            $users_id = intval($_GET["users_id"]);
+            $controller->getEventByUserId($users_id);
         }
         break;
     case "POST":

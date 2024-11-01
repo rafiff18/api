@@ -322,5 +322,26 @@ class EventController {
             response(false, 'No upcoming events found', null, 'No events are scheduled for upcoming dates', 404);
         }
     }
+
+    public function pastEvent() {
+        $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
+        
+        $query = "SELECT * FROM event_main WHERE date_start <= ? ORDER BY date_start DESC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$currentDate]);
+    
+        $data = array();
+        
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Past Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No past events found', null, 'No events have been scheduled in the past', 404);
+        }
+    }
+
+            
 }
 ?>
