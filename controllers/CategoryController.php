@@ -19,7 +19,7 @@ class CategoryController {
             $data[] = $row;
         }
 
-        response(true, 'List of Categories Retrieved Successfully', $data);
+        response('success', 'List of Categories Retrieved Successfully', $data);
     }
 
     // Mendapatkan kategori berdasarkan ID

@@ -17,7 +17,7 @@
             $stmt->execute([$user_id, $event_id]);
             $count = $stmt->fetchColumn();
             
-            return $count > 0;
+            response('success', $count > 0 ? 'User has joined this event' : 'User hasn\'t joined this event', ['isJoined' => $count > 0]);
         }
 
         public function register() {
@@ -46,12 +46,7 @@
                 response('error', "Only members can join the event", null, 403);
                 exit;
             }
-        
-            if ($this->isUserJoined($user_id, $event_id)) {
-                response('error', "You have already join this event!", null, 409);
-                exit;
-            }
-        
+
             try {
                 $query = "INSERT INTO regist_event (users_id, event_id) VALUES (?, ?)";
                 $stmt = $this->conn->prepare($query);
@@ -60,13 +55,60 @@
         
                 response('success', "Successfully joining event", $new_data);
             } catch (Exception $e) {
-                response('error', "Registration failed", null,  $e, $e->getCode());
+                response('error', "Registration failed", null, 500);
             }
         }        
 
         public function getEventByUserId($user_id) {
             if ($user_id > 0) {
                 $query = "SELECT 
+                    re.regist_id, 
+                    re.qr_code, 
+                    re.is_present, 
+                    re.registration_time,
+                    u.username, 
+                    e.event_id, 
+                    e.title, 
+                    e.poster,
+                    e.desc_event,
+                    e.date_start,
+                    e.date_end,
+                    e.location, 
+                    e.category_id,
+                    c.category_name,
+                    e.quota
+                FROM 
+                    regist_event re
+                JOIN 
+                    users u ON re.users_id = u.users_id
+                JOIN 
+                    event_main e ON re.event_id = e.event_id
+                JOIN category c ON e.category_id = c.category_id
+                WHERE 
+                    re.users_id = ?
+                    AND re.is_present = 1 -- Hanya pilih data dengan is_present = true
+                ORDER BY 
+                    re.registration_time DESC;
+                ";
+                    
+                $stmt = $this->conn->prepare($query);
+                $stmt->execute([$user_id]);
+        
+                if ($stmt->rowCount() > 0) {
+                    $data = $stmt->fetchAll(PDO::FETCH_OBJ);
+                    response('success', 'Events Retrieved Successfully', $data);
+                } else {
+                    response('error', 'No Events Found for this user', null, 404);
+                }
+            } else {
+                response('error', 'Invalid User ID', null, 401);
+            }
+        }
+        
+
+        public function upcomingEvent($user_id) {
+            // Query untuk memilih event yang tanggal mulai lebih besar dari tanggal sekarang (berarti akan datang)
+            $query = "SELECT 
                 re.regist_id, 
                 re.qr_code, 
                 re.is_present, 
@@ -88,24 +130,29 @@
                 users u ON re.users_id = u.users_id
             JOIN 
                 event_main e ON re.event_id = e.event_id
-            JOIN category c ON e.category_id = c.category_id
-            WHERE re.users_id = ?
+            JOIN 
+                category c ON e.category_id = c.category_id
+            WHERE 
+                re.users_id = ?
+                AND e.date_start > NOW() -- Menambahkan kondisi untuk hanya menampilkan event yang akan datang
             ORDER BY 
                 re.registration_time DESC;
             ";
-                
-                $stmt = $this->conn->prepare($query);
-                $stmt->execute([$user_id]);
-    
-                if ($stmt->rowCount() > 0) {
-                    $data = $stmt->fetchAll(PDO::FETCH_OBJ);
-                    response('success', 'Events Retrieved Successfully', $data);
-                } else {
-                    response('error', 'No Events Found for this user', null, 404);
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$user_id]); // Menggunakan $user_id sebagai parameter, bukan $currentDate
+            
+            $data = array();
+            
+            if ($stmt->rowCount() > 0) {
+                while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                    $data[] = $row;
                 }
+                response('success', 'Upcoming Events Retrieved Successfully', $data);
             } else {
-                response('error', 'Invalid Event ID', null, 401);
+                response('error', 'No upcoming events found', null, 404);
             }
         }
+        
     }
 ?>
