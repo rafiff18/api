@@ -357,8 +357,6 @@ class EventController {
         } else {
             response(false, 'No trending events found', null, 'No events have reached the trending threshold', 404);
         }
-    }
-    
-            
+    }            
 }
 ?>

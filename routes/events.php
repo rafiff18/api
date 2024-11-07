@@ -52,12 +52,6 @@ switch ($request_method) {
         break;
     
     case "POST":
-        // Validasi data yang diterima
-        if (!isset($_POST['title']) || empty($_POST['title'])) {
-            header("HTTP/1.0 400 Bad Request");
-            echo json_encode(array('message' => 'Title is required'));
-            return;
-        }
         $controller->createEvent();
         break;
 
