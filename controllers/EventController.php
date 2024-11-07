@@ -316,5 +316,49 @@ class EventController {
             response('error', 'No upcoming events found', null, 404);
         }
     }
+
+    public function pastEvent() {
+        $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
+        
+        $query = "SELECT * FROM event_main WHERE date_start <= ? ORDER BY date_start DESC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$currentDate]);
+    
+        $data = array();
+        
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Past Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No past events found', null, 'No events have been scheduled in the past', 404);
+        }
+    }
+
+    public function trendingEvents() {
+        // Query untuk menghitung jumlah registrasi per event_id dan hanya menampilkan yang trending
+        $query = "SELECT COUNT(a.event_id) AS Count, b.*
+                  FROM regist_event a
+                  INNER JOIN event_main b ON a.event_id = b.event_id
+                  GROUP BY a.event_id";
+
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+    
+        $data = array();
+        
+        if ($stmt->rowCount() > 0) {
+            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
+                $data[] = $row;
+            }
+            response(true, 'Trending Events Retrieved Successfully', $data);
+        } else {
+            response(false, 'No trending events found', null, 'No events have reached the trending threshold', 404);
+        }
+    }
+    
+            
 }
 ?>

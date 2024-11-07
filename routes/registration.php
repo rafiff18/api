@@ -9,20 +9,12 @@ $conn = $database->getConnection();
 $controller = new RegistrationEventController($conn);
 $request_method = $_SERVER["REQUEST_METHOD"];
 
-switch ($request_method) {
-    case "GET":  
-        if (!empty($_GET['user_id']) && !empty($_GET['event_id'])) {
-            $user_id = intval($_GET["user_id"]);
-            $event_id = intval($_GET["event_id"]);
-            $controller->isUserJoined($user_id, $event_id);
-        } elseif (!empty($_GET['upcoming']) && !empty($_GET['user_id'])) {
-            $user_id = intval($_GET['user_id']);
-            $controller->upcomingEvent($user_id);
-        } elseif (!empty($_GET["user_id"])) {
-            $user_id = intval($_GET["user_id"]);
-            $controller->getEventByUserId($user_id);
-        } 
-        
+switch ($request_methos) {
+    case "GET": 
+        if (!empty($_GET["users_id"])) {
+            $users_id = intval($_GET["users_id"]);
+            $controller->getEventByUserId($users_id);
+        }
         break;
     case "POST":
         $controller->register();
