@@ -17,28 +17,35 @@ header("Content-Type: application/json");
 switch ($request_method) {
     case "GET":
         if (!empty($_GET["id"]) && is_numeric($_GET["id"])) {
+            
             // Ambil event berdasarkan ID
             $id = intval($_GET["id"]);
             $controller->getEventById($id);
         } elseif (!empty($_GET["keyword"])) {
+
             // Cari event berdasarkan keyword
             $keyword = $_GET["keyword"];
             $controller->searchEvent($keyword);
         } elseif (!empty($_GET["filter"])) {
+
             // Filter event berdasarkan tanggal
             $filter = $_GET["filter"];
             $controller->filterEventsByDate($filter);
         } elseif (!empty($_GET["category_id"]) && is_numeric($_GET["category_id"])) {
+
             // Ambil kategori berdasarkan ID
             $category_id = intval($_GET["category_id"]);
             $controller->getEventByCategoryId($category_id);
         } elseif (isset($_GET["upcoming"])) { 
+
             // Ambil upcoming events
             $controller->upcomingEvent();
         } elseif (isset($_GET["trending"])) { 
+
             // Ambil event trending
             $controller->trendingEvents();
         } else {
+            
             // Ambil semua event
             $controller->getAllEvent();
         }
