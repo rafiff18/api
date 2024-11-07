@@ -45,38 +45,74 @@ class LikeController {
         }
     }
 
+    public function getLikeByUserAndEvent($userId, $eventId) {
+        try {
+            // Query untuk memeriksa apakah like ada berdasarkan users_id dan event_id
+            $query = "SELECT like_id FROM like_event WHERE users_id = ? AND event_id = ?";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$userId, $eventId]);
+    
+            // Periksa apakah data ditemukan
+            if ($stmt->rowCount() > 0) {
+                $likeData = $stmt->fetch(PDO::FETCH_OBJ);
+                response('success', 'Like found', array_merge((array)$likeData, ['is_liked' => true]));
+            } else {
+                response('error', 'No like found for this user and event', ['is_liked'=>false], 404);
+            }
+        } catch (PDOException $e) {
+            response('error', 'Failed to retrieve like', null, 500);
+        }
+    }
+    
     // Menambahkan like baru
     public function createLike() {
+        // Cek apakah request berisi JSON atau form data
         $input = json_decode(file_get_contents('php://input'), true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            response('error', 'Invalid JSON Format', null, 400);
-            return;
+    
+        if (json_last_error() === JSON_ERROR_NONE) {
+            // Jika JSON valid, gunakan data dari JSON
+            $data = $input;
+        } else {
+            // Jika bukan JSON, coba gunakan $_POST sebagai form data
+            $data = $_POST;
         }
-
+    
         $required_fields = ['event_id', 'users_id'];
-        $missing_fields = array_diff($required_fields, array_keys($input));
-
+        $missing_fields = array_diff($required_fields, array_keys($data));
+    
         if (!empty($missing_fields)) {
-            response('error', 'Missing Parameters '.implode(', ', $missing_fields), null, 400);
+            response('error', 'Missing Parameters ' . implode(', ', $missing_fields), null, 400);
             return;
         }
-
+    
         try {
+            // Periksa apakah pengguna sudah menyukai event ini
+            $checkQuery = "SELECT * FROM like_event WHERE event_id = ? AND users_id = ?";
+            $checkStmt = $this->conn->prepare($checkQuery);
+            $checkStmt->execute([$data['event_id'], $data['users_id']]);
+            
+            if ($checkStmt->rowCount() > 0) {
+                // Jika sudah ada, kembalikan respons bahwa user sudah like event ini
+                response('error', 'You have already liked this event', null, 400);
+                return;
+            }
+    
+            // Jika belum ada, tambahkan like baru
             $query = "INSERT INTO like_event (event_id, users_id) VALUES (?, ?)";
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([$input['event_id'], $input['users_id']]);
+            $stmt->execute([$data['event_id'], $data['users_id']]);
             
             $insert_id = $this->conn->lastInsertId();
             $result_stmt = $this->conn->prepare("SELECT * FROM like_event WHERE like_id = ?");
             $result_stmt->execute([$insert_id]);
             $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-
+    
             response('success', 'Like Added Successfully', $new_data);
         } catch (PDOException $e) {
             response('error', 'Failed to Add Like', null, 500);
         }
     }
+    
 
     // Memperbarui like
     public function updateLike($id) {

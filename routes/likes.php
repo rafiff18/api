@@ -18,7 +18,12 @@ switch ($request_method) {
         if (!empty($_GET["id"])) {
             $id = intval($_GET["id"]);
             $controller->getLikeById($id);
-        } else {
+        } else if (!empty($_GET['event_id']) && !empty($_GET['users_id'])) {
+            $event_id = intval($_GET['event_id']);
+            $users_id = intval($_GET['users_id']);
+            $controller->getLikeByUserAndEvent($users_id, $event_id);
+        }
+         else {
             $controller->getAllLikes();
         }
         break;

@@ -137,6 +137,7 @@ class EventController {
             response('error', 'Failed to Delete Event', null, 500);
         }
     }
+    
     public function searchEvent($keyword) {
         $query = "SELECT 
             e.event_id,
@@ -295,6 +296,7 @@ class EventController {
             response('error', 'No events found for this user', null, 404);
         }
     }
+
     public function upcomingEvent() {
         $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
     

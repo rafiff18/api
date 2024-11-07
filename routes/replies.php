@@ -2,12 +2,12 @@
 
 require_once "../helpers/HeaderAccessControl.php";
 require_once "../database/Database.php";
-require_once "../controllers/ReplayCommentController.php";
+require_once "../controllers/ReplyCommentController.php";
 
 $database = new Database();
 $conn = $database->getConnection();
 
-$controller = new ReplayCommentController($conn);
+$controller = new ReplyCommentController($conn);
 $request_method = $_SERVER["REQUEST_METHOD"];
 $data = json_decode(file_get_contents("php://input"));
 
