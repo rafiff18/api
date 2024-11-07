@@ -2,7 +2,7 @@
 require_once "../database/Database.php";
 require_once "../helpers/ResponseHelper.php";
 
-class ReplayCommentController {
+class ReplyCommentController {
     private $db;
 
     public function __construct($db) {

@@ -46,7 +46,11 @@
                 response('error', "Only members can join the event", null, 403);
                 exit;
             }
-
+            if ($this->isUserJoined($user_id, $event_id)) {
+                response('error', "You have already join this event!", null, 409);
+                exit;
+            }
+            
             try {
                 $query = "INSERT INTO regist_event (users_id, event_id) VALUES (?, ?)";
                 $stmt = $this->conn->prepare($query);
