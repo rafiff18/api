@@ -7,7 +7,7 @@ $database = new Database();
 $conn = $database->getConnection();
 
 $controller = new RegistrationEventController($conn);
-$request_methos = $_SERVER["REQUEST_METHOD"];
+$request_method = $_SERVER["REQUEST_METHOD"];
 
 switch ($request_methos) {
     case "GET": 

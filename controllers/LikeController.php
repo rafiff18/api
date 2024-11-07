@@ -21,9 +21,9 @@ class LikeController {
         try {
             $stmt = $this->conn->query($query);
             $data = $stmt->fetchAll(PDO::FETCH_OBJ);
-            response(true, 'Get List of Likes Successfully', $data);
+            response('success', 'Get List of Likes Successfully', $data);
         } catch (PDOException $e) {
-            response(false, 'Failed to get likes', null, 'Internal server error: ' . $e->getMessage(), 500);
+            response('error', 'Failed to get likes', null, 500);
         }
     }
 
@@ -36,12 +36,12 @@ class LikeController {
 
             if ($stmt->rowCount() > 0) {
                 $data = $stmt->fetch(PDO::FETCH_OBJ);
-                response(true, 'Get Like Successfully', $data);
+                response('success', 'Get Like Successfully', $data);
             } else {
-                response(false, 'Like not found', null, 'The requested resource could not be found', 404);
+                response('error', 'Like not found', null, 404);
             }
         } else {
-            response(false, 'Invalid ID', null, 'Bad request: ID is required', 400);
+            response('error', 'Invalid ID', null, 400);
         }
     }
 
@@ -50,7 +50,7 @@ class LikeController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            response(false, 'Invalid JSON Format', null, 'JSON parsing error', 400);
+            response('error', 'Invalid JSON Format', null, 400);
             return;
         }
 
@@ -58,7 +58,7 @@ class LikeController {
         $missing_fields = array_diff($required_fields, array_keys($input));
 
         if (!empty($missing_fields)) {
-            response(false, 'Missing Parameters', null, 'Bad request: Missing required parameters: ' . implode(', ', $missing_fields), 400);
+            response('error', 'Missing Parameters '.implode(', ', $missing_fields), null, 400);
             return;
         }
 
@@ -72,9 +72,9 @@ class LikeController {
             $result_stmt->execute([$insert_id]);
             $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
 
-            response(true, 'Like Added Successfully', $new_data);
+            response('success', 'Like Added Successfully', $new_data);
         } catch (PDOException $e) {
-            response(false, 'Failed to Add Like', null, 'Internal server error: ' . $e->getMessage(), 500);
+            response('error', 'Failed to Add Like', null, 500);
         }
     }
 
@@ -83,12 +83,12 @@ class LikeController {
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            response(false, 'Invalid JSON Format', null, 'JSON parsing error', 400);
+            response('success', 'Invalid JSON Format', null, 400);
             return;
         }
 
         if (empty($input['event_id']) || empty($input['users_id'])) {
-            response(false, 'Missing Parameters', null, 'Both event id and users id are required', 400);
+            response('error', 'Missing Parameters', null, 400);
             return;
         }
 
@@ -103,12 +103,12 @@ class LikeController {
                 $result_stmt->execute([$id]);
                 $updated_data = $result_stmt->fetch(PDO::FETCH_OBJ);
 
-                response(true, 'Like Updated Successfully', $updated_data);
+                response('success', 'Like Updated Successfully', $updated_data);
             } else {
-                response(false, 'No changes made', null, 'No like found with the provided ID or no changes made', 404);
+                response('error', 'No changes made', null, 404);
             }
         } catch (PDOException $e) {
-            response(false, 'Failed to Update Like', null, 'Internal server error: ' . $e->getMessage(), 500);
+            response('error', 'Failed to Update Like', null, 500);
         }
     }
 
@@ -120,15 +120,15 @@ class LikeController {
                 $stmt->execute([$id]);
 
                 if ($stmt->rowCount() > 0) {
-                    response(true, 'Like Deleted Successfully');
+                    response('success', 'Like Deleted Successfully');
                 } else {
-                    response(false, 'Like not found', null, 'No like found with the provided ID', 404);
+                    response('error', 'Like not found', null, 404);
                 }
             } catch (PDOException $e) {
-                response(false, 'Failed to Delete Like', null, 'Internal server error: ' . $e->getMessage(), 500);
+                response('error', 'Failed to Delete Like', null, 500);
             }
         } else {
-            response(false, 'Invalid ID', null, 'Like ID must be provided and greater than 0', 400);
+            response('error', 'Invalid ID', null, 400);
         }
     }
 }
