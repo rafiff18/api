@@ -20,6 +20,15 @@
             response('success', $count > 0 ? 'User has joined this event' : 'User hasn\'t joined this event', ['isJoined' => $count > 0]);
         }
 
+        public function checkIsUserJoined($user_id, $event_id) {
+            $query = "SELECT COUNT(*) FROM regist_event WHERE users_id = ? AND event_id = ?";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([$user_id, $event_id]);
+            $count = $stmt->fetchColumn();
+            
+            return $count > 0;
+        }
+
         public function register() {
             if (!isset($_SESSION["users_id"])) {
                 response('error', "Unauthorized", null, 401);
@@ -46,8 +55,9 @@
                 response('error', "Only members can join the event", null, 403);
                 exit;
             }
-            if ($this->isUserJoined($user_id, $event_id)) {
-                response('error', "You have already join this event!", null, 409);
+            
+            if ($this->checkIsUserJoined($user_id, $event_id)) {
+                response('error', "User have already join this event!", ['isJoined' => true], 409);
                 exit;
             }
             

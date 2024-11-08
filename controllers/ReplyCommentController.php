@@ -36,27 +36,39 @@ class ReplyCommentController {
 
     // Read all replay comments
     public function read() {
-        $query = "SELECT * FROM replay_comment";
+        $query = "SELECT 
+                      replay_comment.replay_id,
+                      replay_comment.users_id,
+                      replay_comment.comment_id,
+                      replay_comment.content_replay,
+                      replay_comment.created_at,
+                      users.username 
+                  FROM replay_comment
+                  JOIN users 
+                  ON replay_comment.users_id = users.users_id"; // Sesuaikan nama kolom `id` di tabel users sesuai dengan struktur Anda
+    
         $stmt = $this->db->query($query);
         $replay_comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+    
         if (count($replay_comments) > 0) {
             $formatted_comments = array();
-
+    
             foreach ($replay_comments as $row) {
                 $formatted_comments[] = array(
-                    "replay_id" => (int)$row["replay_id"], 
-                    "users_id" => (int)$row["users_id"],   
+                    "replay_id" => (int)$row["replay_id"],
+                    "users_id" => (int)$row["users_id"],
+                    "username" => $row["username"],           // Menambahkan username
                     "comment_id" => (int)$row["comment_id"],
-                    "content_replay" => trim($row["content_replay"])
+                    "content_replay" => trim($row["content_replay"]),
+                    "created_at" => $row["created_at"]
                 );
             }
-
+    
             response('success', 'Get reply comments successfully.', $formatted_comments);
         } else {
             response('error', 'No reply comments found.', null, 404);
         }
-    }
+    }    
 
     // Update replay comment
     public function update($data) {

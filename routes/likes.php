@@ -22,6 +22,9 @@ switch ($request_method) {
             $event_id = intval($_GET['event_id']);
             $users_id = intval($_GET['users_id']);
             $controller->getLikeByUserAndEvent($users_id, $event_id);
+        } else if(!empty($_GET['limit'])) {
+            $limit = intval($_GET['limit']);
+            $controller->getEventsByMostLikes($limit);
         }
          else {
             $controller->getAllLikes();

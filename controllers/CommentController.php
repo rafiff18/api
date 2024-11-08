@@ -47,7 +47,7 @@ class CommentController {
 
     public function getCommentByEventId($event_id) {
         if ($event_id > 0) {
-            $query = "SELECT c.comment_id, c.content_comment, u.username
+            $query = "SELECT c.comment_id, c.content_comment, c.created_at, u.username, u.users_id
             FROM comment_event c
             JOIN users u ON c.users_id = u.users_id
             WHERE c.event_id = ?

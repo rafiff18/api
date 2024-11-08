@@ -63,6 +63,30 @@ class LikeController {
             response('error', 'Failed to retrieve like', null, 500);
         }
     }
+
+    // Fungsi untuk mendapatkan event berdasarkan jumlah like terbanyak
+    public function getEventsByMostLikes($limit = 10) {
+        $query = "
+            SELECT e.*, COUNT(l.like_id) AS like_count
+            FROM event_main e
+            LEFT JOIN like_event l ON e.event_id = l.event_id
+            GROUP BY e.event_id
+            ORDER BY like_count DESC
+            LIMIT ?
+        ";
+
+        try {
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $data = $stmt->fetchAll(PDO::FETCH_OBJ);
+            response('success', 'Get Events by Most Likes Successfully', $data);
+        } catch (PDOException $e) {
+            response('error', 'Failed to retrieve events by most likes', null, 500);
+        }
+    }
+
     
     // Menambahkan like baru
     public function createLike() {
