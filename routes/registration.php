@@ -9,7 +9,7 @@ $conn = $database->getConnection();
 $controller = new RegistrationEventController($conn);
 $request_method = $_SERVER["REQUEST_METHOD"];
 
-switch ($request_methos) {
+switch ($request_method) {
     case "GET": 
         if (!empty($_GET["users_id"])) {
             $users_id = intval($_GET["users_id"]);
