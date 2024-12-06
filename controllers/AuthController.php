@@ -1,5 +1,8 @@
 <?php
 require_once "../database/Database.php";
+require_once "../vendor/autoload.php"; // Include Composer's autoloader
+use \Firebase\JWT\JWT; // Use the JWT class from the Firebase\JWT namespace
+
 //yg coba tarisa
 class AuthController {
     private $conn;
@@ -7,7 +10,39 @@ class AuthController {
     public function __construct($conn) {
         $this->conn = $conn;
     }
+    // Generate JWT
+    private function generateJWT($userId, $roles) {
+        $issuedAt = time();
+        $expirationTime = $issuedAt + JWT_EXPIRATION_TIME; // Token valid for the configured expiration time
+        $payload = [
+            'user_id' => $userId,
+            'roles' => $roles,
+            'iat' => $issuedAt,
+            'exp' => $expirationTime,
+        ];
+        
+        return JWT::encode($payload, JWT_SECRET, 'HS256');
+    }
 
+    // Set JWT in cookie
+    private function setJWTInCookie($jwt, $expiration = null) {
+        // Set cookie parameters
+        $cookieParams = [
+            'path' => '/', // Cookie path
+            'domain' => '', // Set domain if needed
+            'secure' => false, // Set to true if using HTTPS
+            'httponly' => true, // Prevent JavaScript access to the cookie
+            'samesite' => 'Strict', // Set SameSite attribute for CSRF protection
+        ];
+    
+        // If expiration is provided, set it; otherwise, it will default to a session cookie
+        if ($expiration) {
+            $cookieParams['expires'] = time() + $expiration;
+        }
+    
+        // Set the cookie
+        setcookie('jwt', $jwt, $cookieParams);
+    }
     // User login
     public function login() {
         $data = json_decode(file_get_contents("php://input"), true);
