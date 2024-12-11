@@ -1,68 +1,46 @@
 <?php
-
-require_once "../helpers/HeaderAccessControl.php";
-require_once "../controllers/UserController.php";
-require_once "../database/Database.php";
+require_once '../controllers/UserController.php';
+require_once "../helpers/ResponseHelper.php";
+require_once '../config/Database.php';
 
 $database = new Database();
-$conn = $database->getConnection();
+$db = $database->getConnection();
 
-$controller = new UserController($conn);
+$userController = new UserController($db);
+
 $request_method = $_SERVER["REQUEST_METHOD"];
+$user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
+$query = isset($_GET['query']) ? $_GET['query'] : null;
 
 switch ($request_method) {
-    case "GET":
-       if (!empty($_GET["id"])) {
-        $id = intval($_GET["id"]);
-        $controller->getUserById($id);
-       } else {
-        $controller->getAllUsers();
-       }
-       break;
-    case "POST":
-        if (isset($_GET['action'])) {
-            if ($_GET['action'] == 'reset_password') {
-                if (!empty($_GET['id'])) {
-                    $id = intval($_GET["id"]);
-                    $controller->resetPassword($id);
-                } else {
-                    header("HTTP/1.0 400 Bad Request");
-                    echo json_encode(['message' => 'ID is required for reset password request']);
-                }
-            } elseif ($_GET['action'] == 'change_password') {
-                if (!empty($_GET['id'])) {
-                    $id = intval($_GET["id"]);
-                    $controller->changePassword($id);
-                } else {
-                    header("HTTP/1.0 400 Bad Request");
-                    echo json_encode(['message' => 'ID is required for change password request']);
-                }
-            }
+    case 'GET':
+        if ($query !== null) {
+            $userController->searchUsers($query);  
+        } elseif ($user_id !== null) {
+            $userController->getUserById($user_id); 
         } else {
-            $controller->createUser();
+            $userController->getAllUsers(); 
         }
         break;
-        
-    case "PUT":
-        if(!empty($_GET['id'])) {
-            $id = intval($_GET["id"]);
-            
-            parse_str(file_get_contents("php://input"), $_PUT);
 
-            $controller->updateUser($id);
+    case 'POST':
+        if ($user_id) {
+            $userController->updateUser($user_id);  
         } else {
-            header("HTTP/1.0 400 Bad Request");
-            echo json_encode(array('message' => 'ID is required for PUT request'));
+            $userController->createUser();
         }
         break;
-    case "DELETE":
-        $id = intval($_GET["users_id"]); // 
-        $controller->deleteUser($id);
+
+    case 'DELETE':
+        if ($user_id) {
+            $userController->deleteUser($user_id);  
+        } else {
+            response('error', 'User ID is required.', null, 400);  
+        }
         break;
+
     default:
-        header("HTTP/1.0 405 Method Not Allowed");
+        response('error', 'Method not allowed.', null, 405); 
         break;
-        
 }
-
 ?>

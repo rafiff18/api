@@ -1,10 +1,10 @@
 RewriteEngine On
 
 # Rute normal ke file PHP
-RewriteRule ^(events|categories|users|likes|comments|replies|tickets|auth|registration|session)/?$ routes/$1.php [NC,L]
+RewriteRule ^(events|available_events|events_count|categories|users|likes|comments|replies|tickets|auth|registration|session)/?$ routes/$1.php [NC,L]
 
 # Rute dengan parameter ID
-RewriteRule ^(events|categories|users|likes|comments|replies|tickets|auth|registration|session)/([0-9]+)/?$ routes/$1.php?id=$2 [NC,L]
+RewriteRule ^(events|available_events|events_count|categories|users|likes|comments|replies|tickets|auth|registration|session)/([0-9]+)/?$ routes/$1.php?id=$2 [NC,L]
 
 # Cek fallback jika rute di atas gagal
 # RewriteRule ^.*$ routes/404.php [L]
