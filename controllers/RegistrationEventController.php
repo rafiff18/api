@@ -1,9 +1,11 @@
 <?php
-    session_start();
-    require_once "../database/Database.php";
     require_once "../helpers/ResponseHelper.php";
+    require_once '../config/JwtConfig.php';
+    require_once '../vendor/autoload.php'; 
 
-    
+    use Firebase\JWT\JWT;
+    use Firebase\JWT\Key;
+
     class RegistrationEventController {
         private $conn;
 
@@ -12,7 +14,7 @@
         }
 
         public function isUserJoined($user_id, $event_id) {
-            $query = "SELECT COUNT(*) FROM regist_event WHERE users_id = ? AND event_id = ?";
+            $query = "SELECT COUNT(*) FROM regist_event WHERE user_id = ? AND event_id = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$user_id, $event_id]);
             $count = $stmt->fetchColumn();
@@ -21,7 +23,7 @@
         }
 
         public function checkIsUserJoined($user_id, $event_id) {
-            $query = "SELECT COUNT(*) FROM regist_event WHERE users_id = ? AND event_id = ?";
+            $query = "SELECT COUNT(*) FROM regist_event WHERE user_id = ? AND event_id = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$user_id, $event_id]);
             $count = $stmt->fetchColumn();
@@ -30,7 +32,7 @@
         }
 
         public function register() {
-            if (!isset($_SESSION["users_id"])) {
+            if (!isset($_COOKIE["refresh_token"])) {
                 response('error', "Unauthorized", null, 401);
                 exit;
             }
@@ -38,20 +40,24 @@
             $input = json_decode(file_get_contents("php://input"), true);
         
             $event_id = $input['event_id'];
-            $user_id = $_SESSION['users_id'];
+            $refresh_token = $_COOKIE['refresh_token'] ?? null;
+            $decoded = JWT::decode($refresh_token, new Key(JWT_SECRET, 'HS256'));
+            $user_id = $decoded->user_id;
         
             if (!$event_id) {
                 response('error', 'Event id is required', null, 400);
                 exit;
             }
         
-            // Periksa role user
-            $role_query = "SELECT role FROM users WHERE users_id = ?";
+            $role_query = "SELECT r.role_name
+                FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.role_id
+                WHERE ur.user_id = ?";
             $role_stmt = $this->conn->prepare($role_query);
             $role_stmt->execute([$user_id]);
             $role = $role_stmt->fetchColumn();
         
-            if ($role !== 'member') {
+            if ($role !== 'Member') {
                 response('error', "Only members can join the event", null, 403);
                 exit;
             }
@@ -62,7 +68,7 @@
             }
             
             try {
-                $query = "INSERT INTO regist_event (users_id, event_id) VALUES (?, ?)";
+                $query = "INSERT INTO regist_event (user_id, event_id) VALUES (?, ?)";
                 $stmt = $this->conn->prepare($query);
                 $stmt->execute([$user_id, $event_id]);
                 $new_data = $stmt->fetch(PDO::FETCH_OBJ);
@@ -94,12 +100,12 @@
                 FROM 
                     regist_event re
                 JOIN 
-                    users u ON re.users_id = u.users_id
+                    user u ON re.user_id = u.user_id
                 JOIN 
                     event_main e ON re.event_id = e.event_id
                 JOIN category c ON e.category_id = c.category_id
                 WHERE 
-                    re.users_id = ?
+                    re.user_id = ?
                     AND re.is_present = 1 -- Hanya pilih data dengan is_present = true
                 ORDER BY 
                     re.registration_time DESC;
@@ -121,7 +127,6 @@
         
 
         public function upcomingEvent($user_id) {
-            // Query untuk memilih event yang tanggal mulai lebih besar dari tanggal sekarang (berarti akan datang)
             $query = "SELECT 
                 re.regist_id, 
                 re.qr_code, 
@@ -141,13 +146,13 @@
             FROM 
                 regist_event re
             JOIN 
-                users u ON re.users_id = u.users_id
+                user u ON re.user_id = u.user_id
             JOIN 
                 event_main e ON re.event_id = e.event_id
             JOIN 
                 category c ON e.category_id = c.category_id
             WHERE 
-                re.users_id = ?
+                re.user_id = ?
                 AND e.date_start > NOW() -- Menambahkan kondisi untuk hanya menampilkan event yang akan datang
             ORDER BY 
                 re.registration_time DESC;

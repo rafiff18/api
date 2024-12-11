@@ -22,7 +22,6 @@ class CategoryController {
         response('success', 'List of Categories Retrieved Successfully', $data);
     }
 
-    // Mendapatkan kategori berdasarkan ID
     public function getCategoryById($id) {
         $query = "SELECT * FROM category WHERE category_id = ? LIMIT 1";
         $stmt = $this->conn->prepare($query);
@@ -36,46 +35,62 @@ class CategoryController {
         }
     }
 
-    // Menambahkan kategori baru
     public function createCategory() {
         $input = json_decode(file_get_contents('php://input'), true);
-
+    
         if (is_null($input) || !isset($input['category_name'])) {
             response('error', 'Invalid JSON or Missing category name', null, 400);
             return;
         }
-
+    
         $query = "INSERT INTO category (category_name) VALUES (?)";
         $stmt = $this->conn->prepare($query);
-
+    
         if ($stmt->execute([$input['category_name']])) {
             $id = $this->conn->lastInsertId();
-            $this->getCategoryById($id); // Menampilkan data yang baru ditambahkan
+    
+            $selectQuery = "SELECT category_name FROM category WHERE category_id = ?";
+            $selectStmt = $this->conn->prepare($selectQuery);
+            $selectStmt->execute([$id]);
+            $category = $selectStmt->fetch(PDO::FETCH_ASSOC);
+    
+            response('success', 'Category Created Successfully', [
+                'category_id' => $id,
+                'category_name' => $category['category_name']
+            ], 201);
         } else {
             response('error', 'Failed to Create Category', null, 500);
         }
     }
+    
 
-    // Memperbarui kategori
     public function updateCategory($id) {
+        // Decode JSON input
         $input = json_decode(file_get_contents('php://input'), true);
-
+    
         if (is_null($input) || !isset($input['category_name'])) {
             response('error', 'Invalid JSON or Missing Category Name', null, 400);
             return;
         }
-
+    
         $query = "UPDATE category SET category_name = ? WHERE category_id = ?";
         $stmt = $this->conn->prepare($query);
-
+    
         if ($stmt->execute([$input['category_name'], $id])) {
-            $this->getCategoryById($id); // Menampilkan data yang diperbarui
+            $selectQuery = "SELECT category_name FROM category WHERE category_id = ?";
+            $selectStmt = $this->conn->prepare($selectQuery);
+            $selectStmt->execute([$id]);
+            $category = $selectStmt->fetch(PDO::FETCH_ASSOC);
+    
+            response('success', 'Category Updated Successfully', [
+                'category_id' => $id,
+                'category_name' => $category['category_name']
+            ], 200);
         } else {
             response('error', 'Failed to Update Category', null, 500);
         }
-    }
+    }    
 
-    // Menghapus kategori
     public function deleteCategory($id) {
         $stmt = $this->conn->prepare("DELETE FROM category WHERE category_id = ?");
 

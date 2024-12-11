@@ -1,362 +1,626 @@
 <?php
-
-require_once "../database/Database.php";
-require_once "../helpers/ResponseHelper.php";
+require_once '../vendor/autoload.php'; 
+require_once '../helpers/ResponseHelper.php'; 
+require_once '../helpers/FileUploadHelpers.php'; 
+require_once '../helpers/JwtHelper.php'; 
 
 class EventController {
-    private $conn;
+    private $db;
+    private $jwtHelper;
 
-    public function __construct($conn) {
-        if (!$conn) {
-            response(false, 'Database connection failed');
-        }
-        $this->conn = $conn;
+    private $uploadDir;
+
+    public function __construct($db) {
+        $this->db = $db;
+        $this->uploadDir = realpath(__DIR__ . '/../images') . '/';
+        $this->jwtHelper = new JWTHelper(); 
     }
 
-    public function getAllEvent() {
-        $query = "SELECT * FROM event_main";
-        $data = array();
+    private function getRoles() {
+        return $this->jwtHelper->getRoles(); 
+    }
 
-        $stmt = $this->conn->query($query);
+    private function getUserId() {
+        return $this->jwtHelper->getUserId(); 
+    }
 
-        if ($stmt) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
+    public function getEventCountsByStatus() {
+        $query = "
+            SELECT 
+                s.status_id, 
+                s.status_name, 
+                COUNT(e.event_id) AS event_count
+            FROM 
+                status s
+            LEFT JOIN 
+                event e ON s.status_id = e.status
+            GROUP BY 
+                s.status_id, s.status_name
+            ORDER BY 
+                s.status_id ASC
+        ";
+    
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        $counts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        response('success', 'Event counts by status retrieved successfully.', $counts, 200);
+    }
+
+
+    public function getAllEvents() {
+        $category = isset($_GET['category']) ? $_GET['category'] : null;
+        $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
+        $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
+        $searchTerm = isset($_GET['search']) ? $_GET['search'] : null;
+        $status = isset($_GET['status']) ? $_GET['status'] : null;
+        $sortBy = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date_add';
+        $sortOrder = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null; // Let front end decide
+        $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+    
+        $query = "
+            SELECT 
+                e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
+                c.category_name AS category, e.description, e.poster, e.location,
+                e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username AS admin_user,
+                s.status_name AS status, e.note,
+                GROUP_CONCAT(u_inv.username ORDER BY u_inv.username ASC) AS invited_users,
+                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars
+            FROM 
+                event e
+            LEFT JOIN user u ON e.propose_user_id = u.user_id
+            LEFT JOIN category c ON e.category_id = c.category_id
+            LEFT JOIN user a ON e.admin_user_id = a.user_id
+            LEFT JOIN status s ON e.status = s.status_id
+            LEFT JOIN invited i ON e.event_id = i.event_id
+            LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
+            WHERE s.status_name = 'approved'";
+    
+    
+        $params = [];
+    
+        if ($category) {
+            $query .= " AND c.category_name = :category";
+            $params[':category'] = $category;
+        }
+        if ($dateFrom) {
+            $query .= " AND e.date_start >= :dateFrom";
+            $params[':dateFrom'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $query .= " AND e.date_end <= :dateTo";
+            $params[':dateTo'] = $dateTo;
+        }
+        if ($searchTerm) {
+            $query .= " AND (e.title LIKE :searchTerm OR e.description LIKE :searchTerm)";
+            $params[':searchTerm'] = "%$searchTerm%";
+        }
+        if ($status) {
+            $query .= " AND s.status_name = :status";
+            $params[':status'] = $status;
+        }
+    
+        $query .= " GROUP BY 
+                e.event_id, e.title, e.date_add, e.updated, u.username, c.category_name, e.description, e.poster, e.location, e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username, s.status_name, e.note";
+    
+        $query .= " ORDER BY $sortBy $sortOrder";
+    
+        if ($limit !== null) {
+            $query .= " LIMIT :limit OFFSET :offset";
+        }
+    
+        $stmt = $this->db->prepare($query);
+    
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+    
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        }
+    
+        $stmt->execute();
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        foreach ($events as &$event) {
+            $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
+            $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
+            
+            // Map usernames and avatars
+            $event['invited_users'] = [];
+            foreach ($usernames as $index => $username) {
+                $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
+                $event['invited_users'][] = [
+                    'username' => $username,
+                    'avatar' => $avatar
+                ];
             }
-            response('success', 'List of Events Retrieved Successfully', $data);
-        } else {
-            response('error', 'Failed to Retrieve Events', null, 500);
-        }
-    }
-
-    public function getEventById($id = 0) {
-        if ($id != 0) {
-            $query = "SELECT * FROM event_main WHERE event_id = ? LIMIT 1";
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([$id]);
-
-            if ($stmt->rowCount() > 0) {
-                $data = $stmt->fetch(PDO::FETCH_OBJ);
-                response('success', 'Event Retrieved Successfully', $data);
-            } else {
-                response('error', 'Event not found', null, 404);
-            }
-        } else {
-            response('error', 'Invlid id', null, 401);
-        }
-    }
-
-    public function createEvent() {
-        $input = json_decode(file_get_contents("php://input"), true);
-    
-        $requiredFields = ['title', 'date_add', 'category_id', 'desc_event', 
-                           'poster', 'location', 'quota', 'date_start', 'date_end'];
-    
-        foreach ($requiredFields as $field) {
-            if (!isset($input[$field])) {
-                response('success', 'Missing Parameters '.$field, null, 402);
-                return;
-            }
-        }
-    
-        $query = "INSERT INTO event_main (title, date_add, category_id, desc_event, poster, location, quota, date_start, date_end) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $this->conn->prepare($query);
-    
-        if ($stmt->execute([
-            $input['title'], 
-            $input['date_add'], 
-            $input['category_id'], 
-            $input['desc_event'],
-            $input['poster'],
-            $input['location'],
-            $input['quota'],
-            $input['date_start'],
-            $input['date_end'],
-        ])) {
-            $insert_id = $this->conn->lastInsertId();
-    
-            $result_stmt = $this->conn->prepare("SELECT * FROM event_main WHERE event_id = ?");
-            $result_stmt->execute([$insert_id]);
-            $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-    
-            response('success', 'Event Added Successfully', $new_data);
-        } else {
-            response('error', 'Failed to Add Event', null, 500);
-        }
-    }
-    
-    public function updateEvent($id) {
-        $input = json_decode(file_get_contents('php://input'), true);
-    
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            response('success', 'Invalid JSON Format', null, 400);
-            return;
-        }
-    
-        $required_fields = ['title', 'date_add', 'category_id', 'desc_event', 'poster', 'location', 'quota', 'date_start', 'date_end'];
-        $missing_fields = array_diff($required_fields, array_keys($input));
-    
-        if (!empty($missing_fields)) {
-            response('success', 'Missing parameters', null, 403);
-            return;
-        }
-    
-        $query = 'UPDATE event_main SET title = ?, date_add = ?, category_id = ?, desc_event = ?, poster = ?, location = ?, quota = ?, date_start = ?, date_end = ? WHERE event_id = ?';
-        $stmt = $this->conn->prepare($query);
-    
-        if ($stmt->execute([
-            $input['title'], 
-            $input['date_add'], 
-            $input['category_id'], 
-            $input['desc_event'],
-            $input['poster'],
-            $input['location'],
-            $input['quota'],
-            $input['date_start'],
-            $input['date_end'],
-            $id
-        ])) {
-            $query = "SELECT * FROM event_main WHERE event_id = ?";
-            $result_stmt = $this->conn->prepare($query);
-            $result_stmt->execute([$id]);
-            $updated_data = $result_stmt->fetch(PDO::FETCH_OBJ);
-    
-            response('success', 'Event Updated Successfully', $updated_data);
-        } else {
-            response('error', 'Failed to Update Event', null, 500);
-        }
-    }
-    
-    public function deleteEvent($id) {
-        $stmt = $this->conn->prepare('DELETE FROM event_main WHERE event_id = ?');
-
-        if ($stmt->execute([$id])) {
-            response('success', 'Event Deleted Successfully');
-        } else {
-            response('error', 'Failed to Delete Event', null, 500);
-        }
-    }
-    
-    public function searchEvent($keyword) {
-        $query = "SELECT 
-            e.event_id,
-            e.title,
-            e.date_add,
-            e.date_start,
-            e.date_end,
-            e.poster,
-            e.location, 
-            c.category_name 
-        FROM 
-            event_main e
-        JOIN 
-            category c ON e.category_id = c.category_id
-        WHERE 
-            e.title LIKE ?
-      ";
-        $stmt = $this->conn->prepare($query);
         
-        $keyword = "%" . $keyword . "%";
-        $stmt->execute([$keyword]);
-    
-        $data = array();
-    
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
-            }
-            response('success', 'Events Found', $data);
-        } else {
-            response('error', 'No events found matching the search keyword', null, 404);
+            $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
+            $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
+        
+            // Unset unused fields
+            unset($event['invited_avatars']);
         }
+        
+
+        response('success', 'Approved events retrieved successfully.', $events, 200);
+    } 
+    
+    public function getAllEventsProposeUser($userId) {
+        $category = isset($_GET['category']) ? $_GET['category'] : null;
+        $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
+        $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
+        $searchTerm = isset($_GET['search']) ? $_GET['search'] : null;
+        $status = isset($_GET['status']) ? $_GET['status'] : null;
+        $sortBy = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date_add';
+        $sortOrder = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
+        $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+    
+            $query = "
+            SELECT 
+                e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
+                c.category_name AS category, e.description, e.poster, e.location,
+                e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username AS admin_user,
+                s.status_name AS status, e.note,
+                GROUP_CONCAT(u_inv.username ORDER BY u_inv.username ASC) AS invited_users,
+                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars
+            FROM 
+                event e
+            LEFT JOIN user u ON e.propose_user_id = u.user_id
+            LEFT JOIN category c ON e.category_id = c.category_id
+            LEFT JOIN user a ON e.admin_user_id = a.user_id
+            LEFT JOIN status s ON e.status = s.status_id
+            LEFT JOIN invited i ON e.event_id = i.event_id
+            LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
+            WHERE e.propose_user_id = :userId";
+    
+        $params = [':userId' => $userId];
+    
+        if ($category) {
+            $query .= " AND c.category_name = :category";
+            $params[':category'] = $category;
+        }
+        if ($dateFrom) {
+            $query .= " AND e.date_start >= :dateFrom";
+            $params[':dateFrom'] = $dateFrom;
+        }
+        if ($dateTo) {
+            $query .= " AND e.date_end <= :dateTo";
+            $params[':dateTo'] = $dateTo;
+        }
+        if ($searchTerm) {
+            $query .= " AND (e.title LIKE :searchTerm OR e.description LIKE :searchTerm)";
+            $params[':searchTerm'] = "%$searchTerm%";
+        }
+        if ($status) {
+            $query .= " AND s.status_name = :status";
+            $params[':status'] = $status;
+        }
+    
+        $query .= " GROUP BY e.event_id, e.title, e.date_add, e.schedule, e.updated, u.username, c.category_name, 
+                    e.description, e.poster, e.location, e.place, e.quota, e.date_start, e.date_end, a.username, 
+                    s.status_name, e.note";
+    
+        $query .= " ORDER BY $sortBy $sortOrder";
+    
+        if ($limit !== null) {
+            $query .= " LIMIT :limit OFFSET :offset";
+        }
+    
+        $stmt = $this->db->prepare($query);
+    
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+    
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        }
+    
+        $stmt->execute();
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        foreach ($events as &$event) {
+            $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
+            $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
+            
+            $event['invited_users'] = [];
+            foreach ($usernames as $index => $username) {
+                $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
+                $event['invited_users'][] = [
+                    'username' => $username,
+                    'avatar' => $avatar
+                ];
+            }
+        
+            $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
+            $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
+        
+            unset($event['invited_avatars']);
+        }
+        
+
+    
+        response('success', 'Events for Propose user retrieved successfully.', $events, 200);
     }
     
-    public function filterEventsByDate($filterType) {
-        $query = "";
-    
-        switch ($filterType) {
-            case 'latest': // Event terbaru
-                $query = "SELECT e.*, c.category_name 
-                          FROM event_main e 
-                          JOIN category c ON e.category_id = c.category_id 
-                          WHERE e.date_add <= NOW() 
-                          ORDER BY e.date_add DESC";
-                break;
-    
-            case 'last7days': // Event dalam 7 hari terakhir
-                $query = "SELECT e.*, c.category_name 
-                          FROM event_main e 
-                          JOIN category c ON e.category_id = c.category_id 
-                          WHERE e.date_add >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
-                          ORDER BY e.date_add DESC";
-                break;
-    
-            case 'last30days': // Event dalam 30 hari terakhir
-                $query = "SELECT e.*, c.category_name 
-                          FROM event_main e 
-                          JOIN category c ON e.category_id = c.category_id 
-                          WHERE e.date_add >= DATE_SUB(NOW(), INTERVAL 30 DAY) 
-                          ORDER BY e.date_add DESC";
-                break;
-    
-            default:
-                response('error', 'Invalid filter type', null, 404);
-                return;
+    public function getAllEventsAdminUser($adminUserId = null) {
+        $category = isset($_GET['category']) ? $_GET['category'] : null;
+        $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
+        $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
+        $searchTerm = isset($_GET['search']) ? $_GET['search'] : null;
+        $status = isset($_GET['status']) ? $_GET['status'] : null;
+        $sortBy = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'date_add';
+        $sortOrder = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
+        $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+        
+        $query = "
+            SELECT 
+                e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
+                c.category_name AS category, e.description, e.poster, e.location,
+                e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username AS admin_user,
+                s.status_name AS status, e.note,
+                GROUP_CONCAT(u_inv.username ORDER BY u_inv.username ASC) AS invited_users,
+                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars
+            FROM 
+                event e
+            LEFT JOIN user u ON e.propose_user_id = u.user_id
+            LEFT JOIN category c ON e.category_id = c.category_id
+            LEFT JOIN user a ON e.admin_user_id = a.user_id
+            LEFT JOIN status s ON e.status = s.status_id
+            LEFT JOIN invited i ON e.event_id = i.event_id
+            LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
+            WHERE 1=1";
+        
+        $params = [];
+        
+        if ($adminUserId != null) {
+            $query .= " AND e.admin_user_id = :admin_user_id";
+            $params[':admin_user_id'] = $adminUserId;
         }
-    
+        
+        if ($category) {
+            $query .= " AND c.category_name = :category";
+            $params[':category'] = $category;
+        }
+        
+        if ($dateFrom) {
+            $query .= " AND e.date_start >= :dateFrom";
+            $params[':dateFrom'] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $query .= " AND e.date_end <= :dateTo";
+            $params[':dateTo'] = $dateTo;
+        }
+        
+        if ($searchTerm) {
+            $query .= " AND (e.title LIKE :searchTerm OR e.description LIKE :searchTerm)";
+            $params[':searchTerm'] = "%$searchTerm%";
+        }
+        
+        if ($status) {
+            $query .= " AND s.status_name = :status";
+            $params[':status'] = $status;
+        }
+        
+        $query .= " GROUP BY e.event_id, e.title, e.date_add, u.username, c.category_name, e.description, e.poster, 
+            e.location, e.place, e.quota, e.date_start, e.date_end, a.username, s.status_name, e.note";
+        
+        $query .= " ORDER BY $sortBy $sortOrder";
+        
+        if ($limit !== null) {
+            $query .= " LIMIT :limit OFFSET :offset";
+        }
+        
+        $stmt = $this->db->prepare($query);
+        
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        }
+        
+        $stmt->execute();
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($events as &$event) {
+            $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
+            $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
+            
+            $event['invited_users'] = [];
+            foreach ($usernames as $index => $username) {
+                $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
+                $event['invited_users'][] = [
+                    'username' => $username,
+                    'avatar' => $avatar
+                ];
+            }
+        
+            $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
+            $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
+        
+            unset($event['invited_avatars']);
+        }
+        
+       
+        response('success', 'Events retrieved successfully.', $events, 200);
+    }
+
+    public function getEventsByMostLikes($limit = 10) {
+        $query = "
+            SELECT e.*, COUNT(l.like_id) AS like_count
+            FROM event_main e
+            LEFT JOIN likes l ON e.event_id = l.event_id
+            GROUP BY e.event_id
+            ORDER BY like_count DESC
+            LIMIT ?
+        ";
+
         try {
             $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
             $stmt->execute();
-    
+
             $data = $stmt->fetchAll(PDO::FETCH_OBJ);
-    
-            if (count($data) > 0) {
-                response('success', 'Events filtered successfully', $data);
-            } else {
-                response('error', 'No events found for this filter', null, 404);
-            }
+            response('success', 'Get Events by Most Likes Successfully', $data);
         } catch (PDOException $e) {
-            response('error', 'Internal server error', null, 500);
+            response('error', 'Failed to retrieve events by most likes', null, 500);
         }
     }
-
-    public function getEventByCategoryId($id) {
-        if ($id == 0) {
-            response('error', 'Invalid ID', null, 401);
+     
+    public function getEventById($eventId) {
+        // Verify JWT
+        // $token = $this->jwtHelper->decodeJWT(); 
+        if (!is_numeric($eventId)) {
+            response('error', 'Invalid event ID.', null, 400);
             return;
         }
     
-        $query = "SELECT category.*, event_main.* 
-                  FROM category 
-                  LEFT JOIN event_main ON category.category_id = event_main.category_id 
-                  WHERE category.category_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$id]);
+        $stmt = $this->db->prepare("
+            SELECT 
+                e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
+                c.category_name AS category, e.description, e.poster, e.location,
+                e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username AS admin_user,
+                s.status_name AS status, e.note,
+                GROUP_CONCAT(u_inv.username ORDER BY u_inv.username ASC) AS invited_users,
+                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars
+            FROM 
+                event e
+            LEFT JOIN user u ON e.propose_user_id = u.user_id
+            LEFT JOIN category c ON e.category_id = c.category_id
+            LEFT JOIN user a ON e.admin_user_id = a.user_id
+            LEFT JOIN status s ON e.status = s.status_id
+            LEFT JOIN invited i ON e.event_id = i.event_id
+            LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
+            WHERE e.event_id = ?
+            GROUP BY e.event_id
+        ");
+        
+        $stmt->execute([$eventId]);
+        $event = $stmt->fetch(PDO::FETCH_ASSOC);
     
-        if ($stmt->rowCount() > 0) {
-            $categoryData = null;
-            $events = [];
+        if ($event) {
+            $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
+            $avatars = !empty($event['invited_user_avatars']) ? explode(',', $event['invited_user_avatars']) : [];
+    
+            $event['invited_users'] = array_map(function ($username, $avatar) {
+                return [
+                    'username' => $username,
+                    'avatar' => !empty($avatar) ? $avatar : null
+                ];
+            }, $usernames, $avatars);
+    
+            unset($event['invited_user_avatars']);
+    
+            response('success', 'Event retrieved successfully.', $event, 200);
+        } else {
+            response('error', 'Event not found.', null, 404);
+        }      
+    }
+    
+    public function createEvent() {
+        $this->jwtHelper->decodeJWT(); // Verify JWT
+        $roles = $this->getRoles(); // Get roles from JWT
+        
+        if (!in_array('Propose', $roles)) {
+            response('error', 'Unauthorized.', null, 403);
+            return;
+        }
+    
+        $title = $_POST['title'] ?? '';
+        $description = $_POST['description'] ?? '';
+        $location = $_POST['location'] ?? '';
+        $place = $_POST['place'] ?? '';
+        $quota = (int)($_POST['quota'] ?? 0);
+        $dateStart = $_POST['date_start'] ?? '';
+        $dateEnd = $_POST['date_end'] ?? '';
+        $schedule = $_POST['schedule'] ?? null;
+        $categoryId = $_POST['category_id'] ?? null;
+        $proposeUserId = $this->getUserId();
+        $dateAdd = date('Y-m-d H:i:s');
+        $status = 1;
+    
+        if (empty($title) || empty($description) || empty($dateStart) || empty($dateEnd) || $quota <= 0) {
+            response('error', 'All fields are required and quota must be greater than 0.', null, 400);
+            return;
+        }
+    
+        if (isset($_FILES['poster']) && $_FILES['poster']['error'] === UPLOAD_ERR_OK) {
+            $fileUploadHelper = new FileUploadHelper();
+            $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster');
+        } else {
+            response('error', 'Poster file is required or there was an error uploading it.', null, 400);
+            return;
+        }
+    
+        $stmt = $this->db->prepare("
+            INSERT INTO event (title, description, poster, location, place, quota, date_start, date_end, schedule, propose_user_id, category_id, date_add, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+    
+        if ($stmt->execute([$title, $description, $poster, $location, $place, $quota, $dateStart, $dateEnd, $schedule, $proposeUserId, $categoryId, $dateAdd, $status])) {
+            $eventId = $this->db->lastInsertId();
+    
+            $invitedUserIds = [];
+    
+            if (isset($_POST['invited_users']) && !empty(trim($_POST['invited_users']))) {
+                $usernames = array_filter(array_map('trim', explode(',', $_POST['invited_users'])));
+                $invitedUserIds = $this->getUserIdsByUsername($usernames);
+    
+                foreach ($invitedUserIds as $userId) {
+                    $inviteStmt = $this->db->prepare("INSERT INTO invited (event_id, user_id) VALUES (?, ?)");
+                    $inviteStmt->execute([$eventId, $userId]);
+                }
+            }
+    
+            $eventStmt = $this->db->prepare("SELECT * FROM event WHERE event_id = ?");
+            $eventStmt->execute([$eventId]);
+            $event = $eventStmt->fetch(PDO::FETCH_ASSOC);       
+    
+            response('success', 'Event created successfully.', ['event' => $event, 'invited_users' => $invitedUserIds], 201);
+        } else {
+            response('error', 'Failed to create event.', null, 500);
+        }
+    }    
+
+    public function updateEvent($eventId) {
+        $this->jwtHelper->decodeJWT(); 
+        $roles = $this->getRoles(); 
+        $userIdFromJWT = $this->getUserId();
+        
+        if (!in_array('Propose', $roles) && !in_array('Admin', $roles)) {
+            response('error', 'Unauthorized.', null, 403);
+            return;
+        }
+        
+        $title = $_POST['title'] ?? '';
+        $description = $_POST['description'] ?? '';
+        $location = $_POST['location'] ?? '';
+        $place = $_POST['place'] ?? '';
+        $quota = (int)($_POST['quota'] ?? 0);
+        $dateStart = $_POST['date_start'] ?? '';
+        $dateEnd = $_POST['date_end'] ?? '';
+        $schedule = $_POST['schedule'] ?? '';
+        $categoryId = $_POST['category_id'] ?? null;
+        
+        if (empty($title) || empty($description) || empty($dateStart) || empty($dateEnd) || $quota <= 0) {
+            response('error', 'All fields are required and quota must be greater than 0.', null, 400);
+            return;
+        }
+    
+        $fileUploadHelper = new FileUploadHelper($this->uploadDir); 
+    
+        $poster = null;
+        if (isset($_FILES['poster']) && $_FILES['poster']['error'] === UPLOAD_ERR_OK) {
+            $oldPoster = $this->getOldPoster($eventId);
+    
+            if ($oldPoster) {
+                $fileUploadHelper->deleteFile($oldPoster);
+            }
             
-            // Ambil data dari hasil query
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                if (!$categoryData) {
-                    $categoryData = (object) [
-                        'category_id' => $row->category_id,
-                        'category_name' => $row->category_name
-                    ];
-                }
-                
-                if ($row->event_id !== null) {
-                    $events[] = (object) [
-                        'event_id' => $row->event_id,
-                        'title' => $row->title,
-                        'date_add' => $row->date_add,
-                        'desc_event' => $row->desc_event,
-                        'poster' => $row->poster,
-                        'location' => $row->location,
-                        'quota' => $row->quota,
-                        'date_start' => $row->date_start,
-                        'date_end' => $row->date_end
-                    ];
+            $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster', $oldPoster);
+        }
+    
+        $stmt = $this->db->prepare("
+            UPDATE event
+            SET title = ?, description = ?, location = ?, place = ?, quota = ?, date_start = ?, date_end = ?, schedule = ?, category_id = ?, poster = ?
+            WHERE event_id = ?
+        ");
+        
+        if ($stmt->execute([$title, $description, $location, $place, $quota, $dateStart, $dateEnd, $schedule, $categoryId, $poster ?? null, $eventId])) {
+            if (isset($_POST['invited_users']) && !empty($_POST['invited_users'])) {
+                $usernames = explode(',', $_POST['invited_users']); // "user1,user2" => ['user1', 'user2']
+                $invitedUserIds = $this->getUserIdsByUsername($usernames);
+    
+                $deleteStmt = $this->db->prepare("DELETE FROM invited WHERE event_id = ?");
+                $deleteStmt->execute([$eventId]);
+    
+                foreach ($invitedUserIds as $userId) {
+                    $inviteStmt = $this->db->prepare("INSERT INTO invited (event_id, user_id) VALUES (?, ?)");
+                    $inviteStmt->execute([$eventId, $userId]);
                 }
             }
     
-            $responseData = (object) [
-                'category' => $categoryData,
-                'events' => $events
-            ];
+            $updatedEventStmt = $this->db->prepare("SELECT * FROM event WHERE event_id = ?");
+            $updatedEventStmt->execute([$eventId]);
+            $updatedEvent = $updatedEventStmt->fetch(PDO::FETCH_ASSOC);
     
-            response('success', 'Category and Events Retrieved Successfully', $responseData);
+            $invitedStmt = $this->db->prepare("SELECT user_id FROM invited WHERE event_id = ?");
+            $invitedStmt->execute([$eventId]);
+            $invitedUsers = $invitedStmt->fetchAll(PDO::FETCH_ASSOC);
+            $invitedUserIds = array_column($invitedUsers, 'user_id');
+    
+            response('success', 'Event updated successfully.', ['event' => $updatedEvent, 'invited_users' => $invitedUserIds], 200);
         } else {
-            response('error', 'Category not found', null, 404);
+            response('error', 'Failed to update event.', null, 500);
         }
-    }
-    
-    public function getJoinedEventsByUserId($usersId) {
-        if ($usersId == 0) {
-            response('error', 'Invalid User ID', null, 401);
+    }   
+      
+    public function deleteEvent($eventId) {
+        $this->jwtHelper->decodeJWT();
+        $roles = $this->getRoles(); 
+        if (!in_array('Admin', $roles)) {
+            response('error', 'Unauthorized.', null, 403);
             return;
         }
     
-        $query = "SELECT event_main.* 
-                  FROM event_main 
-                  INNER JOIN event_participants ON event_main.event_id = event_participants.event_id 
-                  WHERE event_participants.user_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$usersId]);
+        $stmt = $this->db->prepare("SELECT poster FROM event WHERE event_id = ?");
+        $stmt->execute([$eventId]);
+        $event = $stmt->fetch(PDO::FETCH_ASSOC);
     
-        $data = array();
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
+        if (!$event) {
+            response('error', 'Event not found.', null, 404);
+            return;
+        }
+    
+        $posterPath = $event['poster'] ?? null;
+    
+        if ($posterPath) {
+            $fileUploadHelper = new FileUploadHelper(); 
+            $deleteResult = $fileUploadHelper->deleteFile($posterPath);
+    
+            if ($deleteResult['status'] !== 'success') {
+                response('error', 'Failed to delete poster file.', null, 500);
+                return;
             }
-            response('success', 'List of Joined Events Retrieved Successfully', $data);
+        }
+    
+        $stmt = $this->db->prepare("DELETE FROM event WHERE event_id = ?");
+        if ($stmt->execute([$eventId])) {
+            response('success', 'Event deleted successfully.', null, 200);
         } else {
-            response('error', 'No events found for this user', null, 404);
+            response('error', 'Failed to delete event.', null, 500);
         }
     }
 
-    public function upcomingEvent() {
-        $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
+    public function getUserIdsByUsername(array $usernames) {
+        $placeholders = str_repeat('?,', count($usernames) - 1) . '?';
+        $sql = "SELECT user_id FROM user WHERE username IN ($placeholders)";
+        $stmt = $this->db->prepare($sql);
     
-        // Query untuk memilih event yang tanggal mulai lebih besar dari tanggal sekarang (berarti akan datang)
-        $query = "SELECT * FROM event_main WHERE date_start > ? ORDER BY date_start ASC";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$currentDate]);
-    
-        $data = array();
-        
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
-            }
-            response('success', 'Upcoming Events Retrieved Successfully', $data);
-        } else {
-            response('error', 'No upcoming events found', null, 404);
+        if (!$stmt->execute($usernames)) {
+            response('error', 'Failed to fetch user IDs.', null, 500);
+            return [];
         }
+    
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    public function pastEvent() {
-        $currentDate = date('Y-m-d H:i:s'); // Tanggal sekarang
-        
-        $query = "SELECT * FROM event_main WHERE date_start <= ? ORDER BY date_start DESC";
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$currentDate]);
-    
-        $data = array();
-        
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
-            }
-            response(true, 'Past Events Retrieved Successfully', $data);
-        } else {
-            response(false, 'No past events found', null, 'No events have been scheduled in the past', 404);
-        }
+    private function getOldPoster($eventId) {
+        $stmt = $this->db->prepare("SELECT poster FROM event WHERE event_id = ?");
+        $stmt->execute([$eventId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $result ? $result['poster'] : null;
     }
-
-    public function trendingEvents() {
-        // Query untuk menghitung jumlah registrasi per event_id dan hanya menampilkan yang trending
-        $query = "SELECT COUNT(a.event_id) AS Count, b.*
-                  FROM regist_event a
-                  INNER JOIN event_main b ON a.event_id = b.event_id
-                  GROUP BY a.event_id";
-
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-    
-        $data = array();
-        
-        if ($stmt->rowCount() > 0) {
-            while ($row = $stmt->fetch(PDO::FETCH_OBJ)) {
-                $data[] = $row;
-            }
-            response(true, 'Trending Events Retrieved Successfully', $data);
-        } else {
-            response(false, 'No trending events found', null, 'No events have reached the trending threshold', 404);
-        }
-    }            
 }
-?>

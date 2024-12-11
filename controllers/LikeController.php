@@ -1,6 +1,5 @@
 <?php
 
-require_once "../database/Database.php"; 
 require_once "../helpers/ResponseHelper.php";
 
 class LikeController {
@@ -14,9 +13,8 @@ class LikeController {
         $this->conn = $conn;
     }
 
-    // Mendapatkan semua likes
     public function getAllLikes() {
-        $query = "SELECT * FROM like_event";
+        $query = "SELECT * FROM likes";
         
         try {
             $stmt = $this->conn->query($query);
@@ -27,10 +25,9 @@ class LikeController {
         }
     }
 
-    // Mendapatkan like berdasarkan ID
     public function getLikeById($id = 0) {
         if ($id > 0) {
-            $query = "SELECT * FROM like_event WHERE like_id = ? LIMIT 1";
+            $query = "SELECT * FROM likes WHERE like_id = ? LIMIT 1";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$id]);
 
@@ -47,12 +44,10 @@ class LikeController {
 
     public function getLikeByUserAndEvent($userId, $eventId) {
         try {
-            // Query untuk memeriksa apakah like ada berdasarkan users_id dan event_id
-            $query = "SELECT like_id FROM like_event WHERE users_id = ? AND event_id = ?";
+            $query = "SELECT like_id FROM likes WHERE user_id = ? AND event_id = ?";
             $stmt = $this->conn->prepare($query);
             $stmt->execute([$userId, $eventId]);
     
-            // Periksa apakah data ditemukan
             if ($stmt->rowCount() > 0) {
                 $likeData = $stmt->fetch(PDO::FETCH_OBJ);
                 response('success', 'Like found', array_merge((array)$likeData, ['is_liked' => true]));
@@ -63,82 +58,69 @@ class LikeController {
             response('error', 'Failed to retrieve like', null, 500);
         }
     }
-
-    // Fungsi untuk mendapatkan event berdasarkan jumlah like terbanyak
-    public function getEventsByMostLikes($limit = 10) {
-        $query = "
-            SELECT e.*, COUNT(l.like_id) AS like_count
-            FROM event_main e
-            LEFT JOIN like_event l ON e.event_id = l.event_id
-            GROUP BY e.event_id
-            ORDER BY like_count DESC
-            LIMIT ?
-        ";
-
-        try {
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
-            $stmt->execute();
-
-            $data = $stmt->fetchAll(PDO::FETCH_OBJ);
-            response('success', 'Get Events by Most Likes Successfully', $data);
-        } catch (PDOException $e) {
-            response('error', 'Failed to retrieve events by most likes', null, 500);
-        }
-    }
-
     
-    // Menambahkan like baru
     public function createLike() {
-        // Cek apakah request berisi JSON atau form data
         $input = json_decode(file_get_contents('php://input'), true);
     
         if (json_last_error() === JSON_ERROR_NONE) {
-            // Jika JSON valid, gunakan data dari JSON
             $data = $input;
         } else {
-            // Jika bukan JSON, coba gunakan $_POST sebagai form data
             $data = $_POST;
         }
     
-        $required_fields = ['event_id', 'users_id'];
+        $required_fields = ['event_id', 'user_id'];
         $missing_fields = array_diff($required_fields, array_keys($data));
     
         if (!empty($missing_fields)) {
-            response('error', 'Missing Parameters ' . implode(', ', $missing_fields), null, 400);
+            response('error', 'Missing Parameters: ' . implode(', ', $missing_fields), null, 400);
             return;
         }
     
         try {
-            // Periksa apakah pengguna sudah menyukai event ini
-            $checkQuery = "SELECT * FROM like_event WHERE event_id = ? AND users_id = ?";
+            if (!$this->conn) {
+                response('error', 'Database connection failed', null, 500);
+                return;
+            }
+    
+            $checkQuery = "SELECT * FROM likes WHERE event_id = ? AND user_id = ?";
             $checkStmt = $this->conn->prepare($checkQuery);
-            $checkStmt->execute([$data['event_id'], $data['users_id']]);
-            
+            $checkStmt->execute([$data['event_id'], $data['user_id']]);
+    
             if ($checkStmt->rowCount() > 0) {
-                // Jika sudah ada, kembalikan respons bahwa user sudah like event ini
                 response('error', 'You have already liked this event', null, 400);
                 return;
             }
     
-            // Jika belum ada, tambahkan like baru
-            $query = "INSERT INTO like_event (event_id, users_id) VALUES (?, ?)";
+            $query = "INSERT INTO likes (event_id, user_id) VALUES (?, ?)";
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([$data['event_id'], $data['users_id']]);
-            
+            if (!$stmt->execute([$data['event_id'], $data['user_id']])) {
+                $errorInfo = $stmt->errorInfo();
+                response('error', 'Failed to Add Like: ' . $errorInfo[2], null, 500);
+                return;
+            }
+    
             $insert_id = $this->conn->lastInsertId();
-            $result_stmt = $this->conn->prepare("SELECT * FROM like_event WHERE like_id = ?");
+            if (empty($insert_id)) {
+                response('error', 'Failed to retrieve insert ID', null, 500);
+                return;
+            }
+    
+            $result_stmt = $this->conn->prepare("SELECT * FROM likes WHERE like_id = ?");
             $result_stmt->execute([$insert_id]);
             $new_data = $result_stmt->fetch(PDO::FETCH_OBJ);
     
-            response('success', 'Like Added Successfully', $new_data);
+            if ($new_data) {
+                response('success', 'Like Added Successfully', $new_data);
+            } else {
+                response('error', 'Failed to retrieve like data', null, 500);
+            }
+    
         } catch (PDOException $e) {
-            response('error', 'Failed to Add Like', null, 500);
+            response('error', 'Failed to Add Like: ' . $e->getMessage(), null, 500);
         }
-    }
+    }    
     
 
-    // Memperbarui like
     public function updateLike($id) {
         $input = json_decode(file_get_contents('php://input'), true);
 
@@ -147,18 +129,18 @@ class LikeController {
             return;
         }
 
-        if (empty($input['event_id']) || empty($input['users_id'])) {
+        if (empty($input['event_id']) || empty($input['user_id'])) {
             response('error', 'Missing Parameters', null, 400);
             return;
         }
 
         try {
-            $query = 'UPDATE like_event SET event_id = ?, users_id = ? WHERE like_id = ?';
+            $query = 'UPDATE likes SET event_id = ?, user_id = ? WHERE like_id = ?';
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([$input['event_id'], $input['users_id'], $id]);
+            $stmt->execute([$input['event_id'], $input['user_id'], $id]);
 
             if ($stmt->rowCount() > 0) {
-                $query = "SELECT * FROM like_event WHERE like_id = ?";
+                $query = "SELECT * FROM likes WHERE like_id = ?";
                 $result_stmt = $this->conn->prepare($query);
                 $result_stmt->execute([$id]);
                 $updated_data = $result_stmt->fetch(PDO::FETCH_OBJ);
@@ -172,11 +154,10 @@ class LikeController {
         }
     }
 
-    // Menghapus like
     public function deleteLike($id) {
         if ($id > 0) {
             try {
-                $stmt = $this->conn->prepare('DELETE FROM like_event WHERE like_id = ?');
+                $stmt = $this->conn->prepare('DELETE FROM likes WHERE like_id = ?');
                 $stmt->execute([$id]);
 
                 if ($stmt->rowCount() > 0) {
