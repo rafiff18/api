@@ -201,30 +201,48 @@ class AuthController {
             $refresh_token = str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION']);
         } else {
             $refresh_token = null;
-        }        
-
+        }
+    
         if (!$refresh_token) {
             response('error', 'Token not found. Unauthorized.', null, 401);
             return;
         }
-
+    
         try {
+            // Decode the refresh token to get user_id
             $decoded = JWT::decode($refresh_token, new Key(JWT_SECRET, 'HS256'));
-
+    
             $userId = $decoded->user_id;
-
-            $stmt = $this->db->prepare("SELECT * FROM user WHERE user_id = ?");
+    
+            // Query to get user data along with roles by joining user_roles table
+            $stmt = $this->db->prepare("
+                SELECT u.*, r.role_id
+                FROM user u
+                LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+                LEFT JOIN roles r ON ur.role_id = r.role_id
+                WHERE u.user_id = ?
+            ");
             $stmt->execute([$userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
+            $user = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
             if ($user) {
-                response('success', 'User data fetched successfully.', $user, 200);
+                // Step 1: Get user data without roles
+                $userData = $user[0];  // Assuming all rows are for the same user
+    
+                // Step 2: Combine all role names into an array
+                $roles = array_column($user, 'role_id');
+    
+                // Step 3: Add roles to the user data
+                $userData['roles'] = $roles;
+    
+                // Return response with user data and roles
+                response('success', 'User data fetched successfully.', $userData, 200);
             } else {
                 response('error', 'User not found.', null, 404);
             }
         } catch (Exception $e) {
             response('error', 'Invalid or expired token.', null, 401);
         }
-    }
+    }    
 }
 ?>

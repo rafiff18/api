@@ -3,6 +3,7 @@ require_once '../controllers/EventController.php';
 require_once '../helpers/ResponseHelper.php'; 
 require_once '../helpers/JwtHelper.php'; 
 require_once '../config/Database.php';
+require_once '../helpers/HeaderAccessControl.php';
 
 $database = new Database();
 $db = $database->getConnection();

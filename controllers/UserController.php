@@ -225,40 +225,73 @@ class UserController {
     }   
 
     private function assignRoles() {
-        $deleteQuery = "DELETE FROM user_roles WHERE user_id = :user_id";
-        $stmt = $this->db->prepare($deleteQuery);
-        $stmt->bindParam(":user_id", $this->user_id);
-        $stmt->execute();
-    
         if (empty($this->roles)) {
-            return true;
+            error_log("No roles to assign for user_id: " . $this->user_id); // Debug roles
+            return true; // Tidak ada roles, tidak perlu melanjutkan
         }
     
-        // Assign new roles to the user
-        $insertQuery = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
-        $stmt = $this->db->prepare($insertQuery);
+        if (empty($this->user_id)) {
+            error_log("Error: user_id is null in assignRoles."); // Debug user_id
+            return false; // Batalkan jika user_id tidak valid
+        }
     
-        foreach ($this->roles as $roleId) {
-            $stmt->bindParam(":user_id", $this->user_id);
-            $stmt->bindParam(":role_id", $roleId);
+        try {
+            $this->db->beginTransaction(); // Mulai transaksi
     
-            if (!$stmt->execute()) {
-                return false; 
+            // Ambil roles yang sudah ada untuk user_id ini
+            $existingRolesQuery = "SELECT role_id FROM user_roles WHERE user_id = :user_id";
+            $stmt = $this->db->prepare($existingRolesQuery);
+            $stmt->bindValue(":user_id", $this->user_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $existingRoles = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+            // Tambahkan roles baru jika belum ada
+            $insertQuery = "INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)";
+            $stmt = $this->db->prepare($insertQuery);
+    
+            foreach ($this->roles as $roleId) {
+                if (empty($roleId)) {
+                    error_log("Skipping empty role_id for user_id: " . $this->user_id);
+                    continue; // Abaikan role_id yang kosong
+                }
+    
+                if (in_array($roleId, $existingRoles)) {
+                    error_log("Role_id: $roleId already exists for user_id: " . $this->user_id);
+                    continue; // Abaikan jika role_id sudah ada
+                }
+    
+                $stmt->bindValue(":user_id", $this->user_id, PDO::PARAM_INT);
+                $stmt->bindValue(":role_id", $roleId, PDO::PARAM_INT);
+    
+                if (!$stmt->execute()) {
+                    error_log("Failed to assign role_id: $roleId for user_id: " . $this->user_id);
+                    $this->db->rollBack(); // Rollback jika gagal
+                    return false;
+                }
             }
-        }
     
-        return true;
-    }
+            $this->db->commit(); // Commit transaksi
+            return true;
+    
+        } catch (Exception $e) {
+            $this->db->rollBack(); // Rollback jika ada error
+            error_log("Transaction failed in assignRoles: " . $e->getMessage());
+            return false;
+        }
+    }  
+    
 
     public function updateUser($id) {
         $roles = $this->getRoles();
         $userIdFromJWT = $this->getUserId();
     
+        // Only Superadmin or the user themselves can update their data
         if (!in_array('Superadmin', $roles) && $userIdFromJWT != $id) {
             response('error', 'Unauthorized access.', null, 403);
             return;
         }
     
+        // Get current user data
         $currentUserData = $this->getUserDataById($id);
     
         if (!$currentUserData) {
@@ -266,34 +299,45 @@ class UserController {
             return;
         }
     
-        if (in_array('Superadmin', $roles)) {
+        $this->user_id = $id; // Ensure user_id is set
+    
+        // Allow Superadmin and the user themselves to update username and bio
+        if (in_array('Superadmin', $roles) || $userIdFromJWT == $id) {
             $this->username = htmlspecialchars(strip_tags($_POST['username'] ?? $currentUserData['username']));
-            $this->email = htmlspecialchars(strip_tags($_POST['email'] ?? $currentUserData['email']));
+            $this->about = htmlspecialchars(strip_tags($_POST['about'] ?? $currentUserData['about']));
         } else {
-            $this->username = $currentUserData['username']; 
-            $this->email = $currentUserData['email'];
+            $this->username = $currentUserData['username']; // Keep the original username
+            $this->about = $currentUserData['about'];       // Keep the original bio
         }
     
-        $this->password = htmlspecialchars(strip_tags($_POST['password'] ?? $currentUserData['password']));
-        $this->about = htmlspecialchars(strip_tags($_POST['about'] ?? $currentUserData['about']));
-    
-        $rolesInput = $_POST['roles'] ?? '';
+        // Only Superadmin can update email and roles
         if (in_array('Superadmin', $roles)) {
-            $this->roles = array_map('intval', explode(',', $rolesInput)); 
+            $this->email = htmlspecialchars(strip_tags($_POST['email'] ?? $currentUserData['email']));
+            $rolesInput = $_POST['roles'] ?? '';
+            $this->roles = array_map('intval', explode(',', $rolesInput));
         } else {
-            $this->roles = []; 
+            $this->email = $currentUserData['email'];  // Don't change email for members
+            $this->roles = [];  // Members cannot update roles
         }
     
-        $this->user_id = $id;  
+        // Password logic
+        $this->password = null; // Set to null by default
     
+        // Only change the password if a new password is provided
+        if (!empty($_POST['password'])) {
+            // Hash the new password
+            $this->password = htmlspecialchars(strip_tags($_POST['password']));
+        }
+    
+        // Handle avatar file upload
         if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
             $oldAvatar = $currentUserData['avatar'] ?? null;
     
             $fileUploadHelper = new FileUploadHelper();
-            
+    
             try {
                 $this->avatar = $fileUploadHelper->uploadFile($_FILES['avatar'], 'avatar', $oldAvatar);
-                
+    
                 if ($oldAvatar) {
                     $fileUploadHelper->deleteFile($oldAvatar);
                 }
@@ -302,17 +346,18 @@ class UserController {
                 return;
             }
         } else {
-            $this->avatar = $currentUserData['avatar'];
+            $this->avatar = $currentUserData['avatar'];  // Retain the old avatar if no new one is uploaded
         }
     
+        // Update user data in the database
         if ($this->update($id)) {
             if (!empty($this->roles) && !$this->assignRoles()) {
                 response('error', 'User update failed while updating roles.', null, 400);
             } else {
-                $updatedUserData = $this->getUserDataById($id); 
-                
-                unset($updatedUserData['password']);
-                
+                $updatedUserData = $this->getUserDataById($id);
+    
+                unset($updatedUserData['password']);  // Don't return the password in the response
+    
                 response('success', 'User updated successfully.', $updatedUserData, 200);
             }
         } else {
@@ -320,14 +365,14 @@ class UserController {
         }
     }
     
-       
     private function update($id) {
         $query = "UPDATE " . $this->table_name . " SET username = :username, email = :email, about = :about";
         
         if ($this->avatar) {
             $query .= ", avatar = :avatar"; 
         }
-        
+    
+        // Only include password in the query if it's set (i.e., if the user has provided a new password)
         if (!empty($this->password)) {
             $query .= ", password = :password";  
         }
@@ -341,6 +386,7 @@ class UserController {
         $stmt->bindParam(":about", $this->about);
         $stmt->bindParam(":user_id", $id);
         
+        // If password is set, hash it and bind to the query
         if (!empty($this->password)) {
             $hashedPassword = password_hash($this->password, PASSWORD_BCRYPT);
             $stmt->bindParam(":password", $hashedPassword);
@@ -351,7 +397,7 @@ class UserController {
         }
         
         return $stmt->execute();
-    }
+    }    
     
     private function getUserDataById($id) {
         $query = "SELECT * FROM " . $this->table_name . " WHERE user_id = :user_id";

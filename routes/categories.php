@@ -4,6 +4,7 @@ require_once "../controllers/CategoryController.php";
 require_once "../config/Database.php";
 require_once '../helpers/JwtHelper.php'; 
 require_once '../helpers/ResponseHelper.php'; 
+require_once '../helpers/HeaderAccessControl.php';
 
 $db = new Database();
 $conn = $db->getConnection();

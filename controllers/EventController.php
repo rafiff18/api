@@ -58,7 +58,10 @@ class EventController {
         $sortOrder = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null; // Let front end decide
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+        $upcoming = isset($_GET['upcoming']) ? $_GET['upcoming'] : null; // Add upcoming parameter
+        $mostLikes = isset($_GET['most_likes']) ? $_GET['most_likes'] : null; // Add most_likes parameter
     
+        // Base query to fetch events
         $query = "
             SELECT 
                 e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
@@ -66,7 +69,8 @@ class EventController {
                 e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username AS admin_user,
                 s.status_name AS status, e.note,
                 GROUP_CONCAT(u_inv.username ORDER BY u_inv.username ASC) AS invited_users,
-                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars
+                GROUP_CONCAT(u_inv.avatar ORDER BY u_inv.username ASC) AS invited_avatars,
+                COUNT(l.like_id) AS total_likes -- Count likes for each event
             FROM 
                 event e
             LEFT JOIN user u ON e.propose_user_id = u.user_id
@@ -75,11 +79,16 @@ class EventController {
             LEFT JOIN status s ON e.status = s.status_id
             LEFT JOIN invited i ON e.event_id = i.event_id
             LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
+            LEFT JOIN likes l ON e.event_id = l.event_id -- Join the likes table
             WHERE s.status_name = 'approved'";
     
+        // Add condition for upcoming events if 'upcoming' parameter is passed
+        if ($upcoming === 'true') {
+            $query .= " AND e.date_start > NOW()"; // Only upcoming events
+        }
     
+        // Apply other filters
         $params = [];
-    
         if ($category) {
             $query .= " AND c.category_name = :category";
             $params[':category'] = $category;
@@ -101,17 +110,21 @@ class EventController {
             $params[':status'] = $status;
         }
     
-        $query .= " GROUP BY 
-                e.event_id, e.title, e.date_add, e.updated, u.username, c.category_name, e.description, e.poster, e.location, e.place, e.quota, e.date_start, e.date_end, e.schedule, e.updated, a.username, s.status_name, e.note";
+        // If most_likes is true, order by total_likes in descending order
+        if ($mostLikes === 'true') {
+            $query .= " GROUP BY e.event_id ORDER BY total_likes DESC"; // Most liked events first
+        } else {
+            $query .= " GROUP BY e.event_id ORDER BY $sortBy $sortOrder"; // Default sorting
+        }
     
-        $query .= " ORDER BY $sortBy $sortOrder";
-    
+        // Pagination
         if ($limit !== null) {
             $query .= " LIMIT :limit OFFSET :offset";
         }
     
         $stmt = $this->db->prepare($query);
     
+        // Bind parameters dynamically
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -124,11 +137,11 @@ class EventController {
         $stmt->execute();
         $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+        // Processing invited users and avatars
         foreach ($events as &$event) {
             $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
             $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
-            
-            // Map usernames and avatars
+    
             $event['invited_users'] = [];
             foreach ($usernames as $index => $username) {
                 $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
@@ -137,17 +150,19 @@ class EventController {
                     'avatar' => $avatar
                 ];
             }
-        
+    
             $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
             $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
-        
+    
             // Unset unused fields
             unset($event['invited_avatars']);
         }
-        
-
-        response('success', 'Approved events retrieved successfully.', $events, 200);
-    } 
+    
+        // Return the events response
+        response('success', 'Events retrieved successfully.', $events, 200);
+    }
+    
+    
     
     public function getAllEventsProposeUser($userId) {
         $category = isset($_GET['category']) ? $_GET['category'] : null;
