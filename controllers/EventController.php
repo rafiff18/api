@@ -165,6 +165,15 @@ class EventController {
     
     
     public function getAllEventsProposeUser($userId) {
+        $updateQuery = "
+        UPDATE event
+        SET status = 6
+        WHERE date_end < NOW() AND status = 5
+        ";
+
+        $this->db->prepare($updateQuery)->execute();
+        
+        // Retrieve filters and pagination from query parameters
         $category = isset($_GET['category']) ? $_GET['category'] : null;
         $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
         $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
@@ -175,6 +184,7 @@ class EventController {
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
     
+        // Start building the query
             $query = "
             SELECT 
                 e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
@@ -193,8 +203,10 @@ class EventController {
             LEFT JOIN user u_inv ON i.user_id = u_inv.user_id
             WHERE e.propose_user_id = :userId";
     
+        // Initialize an array for parameters
         $params = [':userId' => $userId];
     
+        // Apply filters if set
         if ($category) {
             $query .= " AND c.category_name = :category";
             $params[':category'] = $category;
@@ -216,18 +228,23 @@ class EventController {
             $params[':status'] = $status;
         }
     
+        // Include the necessary columns in the GROUP BY clause
         $query .= " GROUP BY e.event_id, e.title, e.date_add, e.schedule, e.updated, u.username, c.category_name, 
                     e.description, e.poster, e.location, e.place, e.quota, e.date_start, e.date_end, a.username, 
                     s.status_name, e.note";
     
+        // Sorting
         $query .= " ORDER BY $sortBy $sortOrder";
     
+        // Pagination
         if ($limit !== null) {
             $query .= " LIMIT :limit OFFSET :offset";
         }
     
+        // Prepare and execute the statement
         $stmt = $this->db->prepare($query);
     
+        // Bind the parameters
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -237,13 +254,16 @@ class EventController {
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         }
     
+        // Execute and fetch the events
         $stmt->execute();
         $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+        // Convert invited_users to array and include their avatars
         foreach ($events as &$event) {
             $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
             $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
             
+            // Map usernames and avatars
             $event['invited_users'] = [];
             foreach ($usernames as $index => $username) {
                 $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
@@ -253,18 +273,28 @@ class EventController {
                 ];
             }
         
+            // Handle propose_user_avatar and schedule
             $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
             $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
         
+            // Unset unused fields
             unset($event['invited_avatars']);
         }
-        
-
     
         response('success', 'Events for Propose user retrieved successfully.', $events, 200);
     }
     
     public function getAllEventsAdminUser($adminUserId = null) {
+        $updateQuery = "
+        UPDATE event
+        SET status = 6
+        WHERE date_end < NOW() AND status = 5
+        ";
+
+        $this->db->prepare($updateQuery)->execute();
+        
+
+        // Retrieve filters and pagination from query parameters
         $category = isset($_GET['category']) ? $_GET['category'] : null;
         $dateFrom = isset($_GET['date_from']) ? $_GET['date_from'] : null;
         $dateTo = isset($_GET['date_to']) ? $_GET['date_to'] : null;
@@ -275,6 +305,7 @@ class EventController {
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
         
+        // Start building the query
         $query = "
             SELECT 
                 e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
@@ -325,17 +356,22 @@ class EventController {
             $params[':status'] = $status;
         }
         
+        // Include the necessary columns in the GROUP BY clause
         $query .= " GROUP BY e.event_id, e.title, e.date_add, u.username, c.category_name, e.description, e.poster, 
             e.location, e.place, e.quota, e.date_start, e.date_end, a.username, s.status_name, e.note";
         
+        // Sorting
         $query .= " ORDER BY $sortBy $sortOrder";
         
+        // Pagination
         if ($limit !== null) {
             $query .= " LIMIT :limit OFFSET :offset";
         }
         
+        // Prepare and execute the query
         $stmt = $this->db->prepare($query);
         
+        // Bind the parameters
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -345,13 +381,16 @@ class EventController {
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         }
         
+        // Execute and fetch the events
         $stmt->execute();
         $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Convert invited_users to array and include their avatars
         foreach ($events as &$event) {
             $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
             $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
             
+            // Map usernames and avatars
             $event['invited_users'] = [];
             foreach ($usernames as $index => $username) {
                 $avatar = isset($avatars[$index]) ? $avatars[$index] : null;
@@ -361,9 +400,11 @@ class EventController {
                 ];
             }
         
+            // Handle propose_user_avatar and schedule
             $event['propose_user_avatar'] = !empty($event['propose_user_avatar']) ? $event['propose_user_avatar'] : null;
             $event['schedule'] = !empty($event['schedule']) ? $event['schedule'] : null;
         
+            // Unset unused fields
             unset($event['invited_avatars']);
         }
         
@@ -394,13 +435,24 @@ class EventController {
     }
      
     public function getEventById($eventId) {
+        $updateQuery = "
+        UPDATE event
+        SET status = 6
+        WHERE date_end < NOW() AND status = 5
+        ";
+
+        $this->db->prepare($updateQuery)->execute();
+
         // Verify JWT
-        // $token = $this->jwtHelper->decodeJWT(); 
+        $this->jwtHelper->decodeJWT(); 
+    
+        // Check if event_id is valid
         if (!is_numeric($eventId)) {
             response('error', 'Invalid event ID.', null, 400);
             return;
         }
     
+        // Query to retrieve event data
         $stmt = $this->db->prepare("
             SELECT 
                 e.event_id, e.title, e.date_add, u.username AS propose_user, u.avatar AS propose_user_avatar,
@@ -424,21 +476,26 @@ class EventController {
         $stmt->execute([$eventId]);
         $event = $stmt->fetch(PDO::FETCH_ASSOC);
     
+        // Check if event is found
         if ($event) {
+            // Convert invited_users and invited_user_avatars to arrays
             $usernames = !empty($event['invited_users']) ? explode(',', $event['invited_users']) : [];
-            $avatars = !empty($event['invited_user_avatars']) ? explode(',', $event['invited_user_avatars']) : [];
+            $avatars = !empty($event['invited_avatars']) ? explode(',', $event['invited_avatars']) : [];
     
             $event['invited_users'] = array_map(function ($username, $avatar) {
                 return [
                     'username' => $username,
-                    'avatar' => !empty($avatar) ? $avatar : null
+                    'avatar' => !empty($avatar) ? $avatar : null // Explicitly set null for empty avatars
                 ];
             }, $usernames, $avatars);
     
-            unset($event['invited_user_avatars']);
+            // Remove invited_avatars from the response
+            unset($event['invited_avatars']);
     
+            // Send successful response
             response('success', 'Event retrieved successfully.', $event, 200);
         } else {
+            // If event not found
             response('error', 'Event not found.', null, 404);
         }      
     }
@@ -446,12 +503,12 @@ class EventController {
     public function createEvent() {
         $this->jwtHelper->decodeJWT(); // Verify JWT
         $roles = $this->getRoles(); // Get roles from JWT
-        
         if (!in_array('Propose', $roles)) {
             response('error', 'Unauthorized.', null, 403);
             return;
         }
     
+        // Validate and collect data
         $title = $_POST['title'] ?? '';
         $description = $_POST['description'] ?? '';
         $location = $_POST['location'] ?? '';
@@ -465,19 +522,17 @@ class EventController {
         $dateAdd = date('Y-m-d H:i:s');
         $status = 1;
     
+        // Validate required fields
         if (empty($title) || empty($description) || empty($dateStart) || empty($dateEnd) || $quota <= 0) {
             response('error', 'All fields are required and quota must be greater than 0.', null, 400);
             return;
         }
     
-        if (isset($_FILES['poster']) && $_FILES['poster']['error'] === UPLOAD_ERR_OK) {
-            $fileUploadHelper = new FileUploadHelper();
-            $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster');
-        } else {
-            response('error', 'Poster file is required or there was an error uploading it.', null, 400);
-            return;
-        }
+        // Upload poster
+        $fileUploadHelper = new FileUploadHelper();
+        $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster');
     
+        // Insert event into the database
         $stmt = $this->db->prepare("
             INSERT INTO event (title, description, poster, location, place, quota, date_start, date_end, schedule, propose_user_id, category_id, date_add, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -486,11 +541,17 @@ class EventController {
         if ($stmt->execute([$title, $description, $poster, $location, $place, $quota, $dateStart, $dateEnd, $schedule, $proposeUserId, $categoryId, $dateAdd, $status])) {
             $eventId = $this->db->lastInsertId();
     
+            // Process invited users using their IDs
             $invitedUserIds = [];
-    
             if (isset($_POST['invited_users']) && !empty(trim($_POST['invited_users']))) {
-                $usernames = array_filter(array_map('trim', explode(',', $_POST['invited_users'])));
-                $invitedUserIds = $this->getUserIdsByUsername($usernames);
+                $userIds = array_map('trim', explode(',', $_POST['invited_users']));
+                $invitedUserIds = $this->getExistingUserIds($userIds);
+    
+                // Validate that all provided user IDs exist
+                if (count($userIds) !== count($invitedUserIds)) {
+                    response('error', 'Some invited users do not exist.', null, 400);
+                    return;
+                }
     
                 foreach ($invitedUserIds as $userId) {
                     $inviteStmt = $this->db->prepare("INSERT INTO invited (event_id, user_id) VALUES (?, ?)");
@@ -498,97 +559,179 @@ class EventController {
                 }
             }
     
+            // Fetch event data
             $eventStmt = $this->db->prepare("SELECT * FROM event WHERE event_id = ?");
             $eventStmt->execute([$eventId]);
-            $event = $eventStmt->fetch(PDO::FETCH_ASSOC);       
+            $event = $eventStmt->fetch(PDO::FETCH_ASSOC);
     
-            response('success', 'Event created successfully.', ['event' => $event, 'invited_users' => $invitedUserIds], 201);
+            // Fetch invited users data with username and avatar
+            $invitedUsersStmt = $this->db->prepare("
+                SELECT u.username, u.avatar 
+                FROM user u
+                JOIN invited i ON u.user_id = i.user_id
+                WHERE i.event_id = ?
+            ");
+            $invitedUsersStmt->execute([$eventId]);
+            $invitedUsers = $invitedUsersStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+            // Prepare response data
+            $responseData = [
+                'event' => array_merge($event, [
+                    'invited_users' => $invitedUsers
+                ])
+            ];
+    
+            response('success', 'Event created successfully.', $responseData, 201);
         } else {
             response('error', 'Failed to create event.', null, 500);
         }
-    }    
+    }
+
+    private function getExistingUserIds(array $userIds) {
+        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+        $stmt = $this->db->prepare("SELECT user_id FROM user WHERE user_id IN ($placeholders)");
+        $stmt->execute($userIds);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }   
 
     public function updateEvent($eventId) {
-        $this->jwtHelper->decodeJWT(); 
-        $roles = $this->getRoles(); 
-        $userIdFromJWT = $this->getUserId();
+        $this->jwtHelper->decodeJWT(); // Verify JWT
+        $roles = $this->getRoles(); // Get roles from JWT
+        $userIdFromJWT = $this->getUserId(); // Get user ID from JWT
         
-        if (!in_array('Propose', $roles) && !in_array('Admin', $roles)) {
+        // Validate roles
+        if (!array_intersect(['Propose', 'Admin', 'Superadmin'], $roles)) {
             response('error', 'Unauthorized.', null, 403);
             return;
         }
-        
-        $title = $_POST['title'] ?? '';
-        $description = $_POST['description'] ?? '';
-        $location = $_POST['location'] ?? '';
-        $place = $_POST['place'] ?? '';
-        $quota = (int)($_POST['quota'] ?? 0);
-        $dateStart = $_POST['date_start'] ?? '';
-        $dateEnd = $_POST['date_end'] ?? '';
-        $schedule = $_POST['schedule'] ?? '';
-        $categoryId = $_POST['category_id'] ?? null;
-        
-        if (empty($title) || empty($description) || empty($dateStart) || empty($dateEnd) || $quota <= 0) {
-            response('error', 'All fields are required and quota must be greater than 0.', null, 400);
-            return;
-        }
     
-        $fileUploadHelper = new FileUploadHelper($this->uploadDir); 
+        // For 'Admin' or 'Super Admin', only notes and status can be updated
+        if (array_intersect(['Admin', 'Superadmin'], $roles)) {
+            $note = $_POST['note'] ?? '';
+            $status = $_POST['status'] ?? null;
     
-        $poster = null;
-        if (isset($_FILES['poster']) && $_FILES['poster']['error'] === UPLOAD_ERR_OK) {
-            $oldPoster = $this->getOldPoster($eventId);
+            // // Validate note
+            // if (empty($note)) {
+            //     response('error', 'Note is required for Admin or Superadmin.', null, 400);
+            //     return;
+            // }
     
-            if ($oldPoster) {
-                $fileUploadHelper->deleteFile($oldPoster);
+            // Validate status (only one status, between 1 and 6)
+            if ($status === null || !is_numeric($status) || (int)$status < 1 || (int)$status > 6) {
+                response('error', 'Valid status is required for Admin or Superadmin (values: 1-6).', null, 400);
+                return;
             }
-            
-            $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster', $oldPoster);
-        }
     
-        $stmt = $this->db->prepare("
-            UPDATE event
-            SET title = ?, description = ?, location = ?, place = ?, quota = ?, date_start = ?, date_end = ?, schedule = ?, category_id = ?, poster = ?
-            WHERE event_id = ?
-        ");
-        
-        if ($stmt->execute([$title, $description, $location, $place, $quota, $dateStart, $dateEnd, $schedule, $categoryId, $poster ?? null, $eventId])) {
-            if (isset($_POST['invited_users']) && !empty($_POST['invited_users'])) {
-                $usernames = explode(',', $_POST['invited_users']); // "user1,user2" => ['user1', 'user2']
-                $invitedUserIds = $this->getUserIdsByUsername($usernames);
+            // Update note and status, and track admin or Superadmin user
+            $stmt = $this->db->prepare("
+                UPDATE event
+                SET note = ?, status = ?, admin_user_id = ?
+                WHERE event_id = ?
+            ");
     
-                $deleteStmt = $this->db->prepare("DELETE FROM invited WHERE event_id = ?");
-                $deleteStmt->execute([$eventId]);
+            if ($stmt->execute([$note, $status, $userIdFromJWT, $eventId])) {
+                $updatedEventStmt = $this->db->prepare("SELECT note, status, admin_user_id FROM event WHERE event_id = ?");
+                $updatedEventStmt->execute([$eventId]);
+                $updatedEvent = $updatedEventStmt->fetch(PDO::FETCH_ASSOC);
     
-                foreach ($invitedUserIds as $userId) {
-                    $inviteStmt = $this->db->prepare("INSERT INTO invited (event_id, user_id) VALUES (?, ?)");
-                    $inviteStmt->execute([$eventId, $userId]);
+                response('success', 'Event updated successfully by Admin or Superadmin.', ['event' => $updatedEvent], 200);
+            } else {
+                response('error', 'Failed to update event.', null, 500);
+            }
+        } else if (in_array('Propose', $roles)) {
+            // Validate all fields except notes for 'Propose'
+            $title = $_POST['title'] ?? '';
+            $description = $_POST['description'] ?? '';
+            $location = $_POST['location'] ?? '';
+            $place = $_POST['place'] ?? '';
+            $quota = (int)($_POST['quota'] ?? 0);
+            $dateStart = $_POST['date_start'] ?? '';
+            $dateEnd = $_POST['date_end'] ?? '';
+            $schedule = $_POST['schedule'] ?? '';
+            $categoryId = $_POST['category_id'] ?? null;
+    
+            if (empty($title) || empty($description) || empty($dateStart) || empty($dateEnd) || $quota <= 0) {
+                response('error', 'All fields are required and quota must be greater than 0.', null, 400);
+                return;
+            }
+    
+            $fileUploadHelper = new FileUploadHelper($this->uploadDir);
+    
+            // Check if a new file has been uploaded
+            $poster = null;
+            if (isset($_FILES['poster']) && $_FILES['poster']['error'] === UPLOAD_ERR_OK) {
+                $oldPoster = $this->getOldPoster($eventId);
+                if ($oldPoster) {
+                    $fileUploadHelper->deleteFile($oldPoster);
                 }
+                $poster = $fileUploadHelper->uploadFile($_FILES['poster'], 'poster', $oldPoster);
             }
     
-            $updatedEventStmt = $this->db->prepare("SELECT * FROM event WHERE event_id = ?");
-            $updatedEventStmt->execute([$eventId]);
-            $updatedEvent = $updatedEventStmt->fetch(PDO::FETCH_ASSOC);
+            // If no new file uploaded, maintain the old poster
+            if ($poster === null) {
+                $poster = $this->getOldPoster($eventId);
+            }
     
-            $invitedStmt = $this->db->prepare("SELECT user_id FROM invited WHERE event_id = ?");
-            $invitedStmt->execute([$eventId]);
-            $invitedUsers = $invitedStmt->fetchAll(PDO::FETCH_ASSOC);
-            $invitedUserIds = array_column($invitedUsers, 'user_id');
+            $stmt = $this->db->prepare("
+                UPDATE event
+                SET title = ?, description = ?, location = ?, place = ?, quota = ?, date_start = ?, date_end = ?, schedule = ?, category_id = ?, poster = ?, status = 3
+                WHERE event_id = ?
+            ");
     
-            response('success', 'Event updated successfully.', ['event' => $updatedEvent, 'invited_users' => $invitedUserIds], 200);
-        } else {
-            response('error', 'Failed to update event.', null, 500);
+            if ($stmt->execute([$title, $description, $location, $place, $quota, $dateStart, $dateEnd, $schedule, $categoryId, $poster, $eventId])) {
+                $invitedUserIds = [];
+                if (isset($_POST['invited_users']) && !empty($_POST['invited_users'])) {
+                    $invitedid = explode(',', $_POST['invited_users']);
+                    $invitedUserIds = $this->getExistingUserIds(array_map('intval', $invitedid)); // Hanya ID pengguna yang ada
+    
+                    // Validate that all provided invitedid were found
+                    if (count($invitedid) !== count($invitedUserIds)) {
+                        response('error', 'Some invited users do not exist.', null, 400);
+                        return;
+                    }
+    
+                    $deleteStmt = $this->db->prepare("DELETE FROM invited WHERE event_id = ?");
+                    $deleteStmt->execute([$eventId]);
+    
+                    foreach ($invitedUserIds as $userId) {
+                        $inviteStmt = $this->db->prepare("INSERT INTO invited (event_id, user_id) VALUES (?, ?)");
+                        $inviteStmt->execute([$eventId, $userId]);
+                    }
+                }
+    
+                // Fetch the updated event data
+                $updatedEventStmt = $this->db->prepare("SELECT * FROM event WHERE event_id = ?");
+                $updatedEventStmt->execute([$eventId]);
+                $updatedEvent = $updatedEventStmt->fetch(PDO::FETCH_ASSOC);
+    
+                // Fetch invited users with username and avatar
+                $invitedUsersStmt = $this->db->prepare("
+                    SELECT u.username, u.avatar 
+                    FROM user u
+                    JOIN invited i ON u.user_id = i.user_id
+                    WHERE i.event_id = ?
+                ");
+                $invitedUsersStmt->execute([$eventId]);
+                $invitedUsers = $invitedUsersStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+                response('success', 'Event updated successfully.', [
+                    'event' => array_merge($updatedEvent, ['invited_users' => $invitedUsers])
+                ], 200);
+            } else {
+                response('error', 'Failed to update event.', null, 500);
+            }
         }
-    }   
+    }     
       
     public function deleteEvent($eventId) {
-        $this->jwtHelper->decodeJWT();
-        $roles = $this->getRoles(); 
+        $this->jwtHelper->decodeJWT(); // Verify JWT
+        $roles = $this->getRoles(); // Get roles from JWT
         if (!in_array('Admin', $roles)) {
             response('error', 'Unauthorized.', null, 403);
             return;
         }
     
+        // Retrieve the event to get the poster path
         $stmt = $this->db->prepare("SELECT poster FROM event WHERE event_id = ?");
         $stmt->execute([$eventId]);
         $event = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -600,8 +743,9 @@ class EventController {
     
         $posterPath = $event['poster'] ?? null;
     
+        // If there is a poster, delete the file using FileUploadHelper
         if ($posterPath) {
-            $fileUploadHelper = new FileUploadHelper(); 
+            $fileUploadHelper = new FileUploadHelper(); // You may pass any specific upload dir if needed
             $deleteResult = $fileUploadHelper->deleteFile($posterPath);
     
             if ($deleteResult['status'] !== 'success') {
@@ -610,6 +754,7 @@ class EventController {
             }
         }
     
+        // Now proceed to delete the event from the database
         $stmt = $this->db->prepare("DELETE FROM event WHERE event_id = ?");
         if ($stmt->execute([$eventId])) {
             response('success', 'Event deleted successfully.', null, 200);

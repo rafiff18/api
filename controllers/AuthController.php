@@ -9,9 +9,15 @@ use Firebase\JWT\Key;
 
 class AuthController {
     private $db;
+    private $jwtHelper;
 
     public function __construct($db) {
         $this->db = $db;
+        $this->jwtHelper = new JWTHelper();
+    }
+
+    private function getUserId() {
+        return $this->jwtHelper->getUserId();
     }
 
     private function generateJWT($userId, $roles) {
@@ -40,6 +46,27 @@ class AuthController {
         return JWT::encode($payload, JWT_SECRET, 'HS256');
     }
 
+    public function refreshToken() {
+        $refresh_token = $_COOKIE['refresh_token'] ?? '';
+
+        if (empty($refresh_token)) {
+            response('error', 'Refresh token is required', null, 401);
+            return;
+        }
+
+        try {
+            $decode = JWT::decode($refresh_token, new Key(JWT_SECRET, 'HS256'));
+            $userId = $decode->user_id;
+            $roles = $decode->roles;
+
+            $newJwt = $this->generateJWT($userId, $roles);
+            $this->setJWTInCookie($newJwt, JWT_EXPIRATION_TIME);
+            response('success', 'Access token refreshed successfully.', ['token'=>$newJwt], 200);
+        } catch (Exception $e) {
+            response('error', 'Invalid or expired refresh token.', null, 401);
+        }
+    }
+
     private function setRefreshTokenInCookie($refreshToken) {
         $cookieParams = [
             'expires' => time() + JWT_REFRESH_EXPIRATION_TIME, 
@@ -50,6 +77,18 @@ class AuthController {
         ];
         
         setcookie('refresh_token', $refreshToken, $cookieParams);
+    }
+
+    private function setJWTInCookie($jwt, $expiration = null) {
+        $cookieParams = [
+            'path' => '/', 
+            'domain' => '', 
+            'secure' => false, 
+            'httponly' => true, 
+            'samesite' => 'Strict', 
+        ];
+    
+        setcookie('jwt', $jwt, $cookieParams);
     }
 
     public function login() {
@@ -195,53 +234,31 @@ class AuthController {
     }
 
     public function checkLogin() {
-        if (isset($_COOKIE['refresh_token'])) {
-            $refresh_token = $_COOKIE['refresh_token'];
-        } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $refresh_token = str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION']);
-        } else {
-            $refresh_token = null;
-        }
-    
-        if (!$refresh_token) {
-            response('error', 'Token not found. Unauthorized.', null, 401);
-            return;
-        }
-    
+        $userId  = $this->getUserId();
         try {
-            // Decode the refresh token to get user_id
-            $decoded = JWT::decode($refresh_token, new Key(JWT_SECRET, 'HS256'));
+            if (!$userId) {
+                response('error', 'User ID not found in token.', null, 401);
+                return;
+            }
     
-            $userId = $decoded->user_id;
-    
-            // Query to get user data along with roles by joining user_roles table
-            $stmt = $this->db->prepare("
-                SELECT u.*, r.role_id
-                FROM user u
-                LEFT JOIN user_roles ur ON u.user_id = ur.user_id
-                LEFT JOIN roles r ON ur.role_id = r.role_id
-                WHERE u.user_id = ?
-            ");
+            $stmt = $this->db->prepare("SELECT u.*, r.role_name FROM user u 
+                                         LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+                                         LEFT JOIN roles r ON ur.role_id = r.role_id 
+                                         WHERE u.user_id = ?");
             $stmt->execute([$userId]);
-            $user = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
             if ($user) {
-                // Step 1: Get user data without roles
-                $userData = $user[0];  // Assuming all rows are for the same user
-    
-                // Step 2: Combine all role names into an array
-                $roles = array_column($user, 'role_id');
-    
-                // Step 3: Add roles to the user data
-                $userData['roles'] = $roles;
-    
-                // Return response with user data and roles
-                response('success', 'User data fetched successfully.', $userData, 200);
+                unset($user['password']);
+                
+                response('success', 'User data fetched successfully.', $user, 200);
             } else {
                 response('error', 'User not found.', null, 404);
             }
+        } catch (PDOException $e) {
+            response('error', $e->getMessage(), null, 500);
         } catch (Exception $e) {
-            response('error', 'Invalid or expired token.', null, 401);
+            response('error', $e->getMessage(), null, $e->getCode() ?? 401);
         }
     }    
 }

@@ -305,6 +305,8 @@ class UserController {
         if (in_array('Superadmin', $roles) || $userIdFromJWT == $id) {
             $this->username = htmlspecialchars(strip_tags($_POST['username'] ?? $currentUserData['username']));
             $this->about = htmlspecialchars(strip_tags($_POST['about'] ?? $currentUserData['about']));
+            $rolesInput = $_POST['roles'] ?? '';
+            $this->roles = array_map('intval', explode(',', $rolesInput));
         } else {
             $this->username = $currentUserData['username']; // Keep the original username
             $this->about = $currentUserData['about'];       // Keep the original bio
